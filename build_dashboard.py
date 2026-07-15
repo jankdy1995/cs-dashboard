@@ -560,21 +560,139 @@ function barChart(el,{labels,series,yFmt,totalLabelLast}){
   });
 }
 
+/* ---------- Live-Daten aus Google Sheets ---------- */
+const CSV_URLS={
+  hubspot:'https://docs.google.com/spreadsheets/d/e/2PACX-1vSxbgk0YjSFwaYYGI6MPKUEmbu6sY4ew5tL4i6poTA3SbkU_MMb26j6TYaJ0ufZjozgl_ZpuYnxZBab/pub?gid=880512542&single=true&output=csv',
+  moinai:'https://docs.google.com/spreadsheets/d/e/2PACX-1vSxbgk0YjSFwaYYGI6MPKUEmbu6sY4ew5tL4i6poTA3SbkU_MMb26j6TYaJ0ufZjozgl_ZpuYnxZBab/pub?gid=1229908884&single=true&output=csv',
+  team:'https://docs.google.com/spreadsheets/d/e/2PACX-1vSxbgk0YjSFwaYYGI6MPKUEmbu6sY4ew5tL4i6poTA3SbkU_MMb26j6TYaJ0ufZjozgl_ZpuYnxZBab/pub?gid=25541729&single=true&output=csv',
+  refunds:'https://docs.google.com/spreadsheets/d/e/2PACX-1vSxbgk0YjSFwaYYGI6MPKUEmbu6sY4ew5tL4i6poTA3SbkU_MMb26j6TYaJ0ufZjozgl_ZpuYnxZBab/pub?gid=1437991345&single=true&output=csv'
+};
+
+function parseCSV(text){
+  const rows=[];let row=[],field='',inQ=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(inQ){
+      if(c==='"'){ if(text[i+1]==='"'){field+='"';i++;} else inQ=false; }
+      else field+=c;
+    }else if(c==='"')inQ=true;
+    else if(c===','){row.push(field);field='';}
+    else if(c==='\n'){row.push(field);rows.push(row);row=[];field='';}
+    else if(c!=='\r')field+=c;
+  }
+  if(field!==''||row.length){row.push(field);rows.push(row);}
+  return rows;
+}
+function parseNum(s){
+  if(s==null)return null;
+  s=String(s).trim();
+  if(!s)return null;
+  const pct=s.includes('%');
+  s=s.replace(/[%€\s ]/g,'');
+  if(/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) s=s.replace(/\./g,'').replace(',','.');
+  else if(/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) s=s.replace(/,/g,'');
+  else if(s.includes(',')&&!s.includes('.')) s=s.replace(',','.');
+  const v=parseFloat(s);
+  if(!isFinite(v))return null;
+  return pct?v/100:v;
+}
+function dataRows(rows){ // Datenzeilen ab Zeile 4, Ende bei nicht-numerischer KW
+  const out=[];
+  for(let i=3;i<rows.length;i++){
+    const kw=parseNum(rows[i][0]);
+    if(kw==null||kw<1||kw>60)break;
+    out.push(rows[i]);
+  }
+  return out;
+}
+function buildLiveData(hsT,maT,tmT,rfT){
+  const n=parseNum;
+  const hs=dataRows(parseCSV(hsT)).map(r=>({kw:Math.round(n(r[0])),created:n(r[1]),
+    user:n(r[2]),partner:n(r[3]),messages:n(r[4]),csat:n(r[5]),mtfr:n(r[6])}));
+  const ma=dataRows(parseCSV(maT)).map(r=>({kw:Math.round(n(r[0])),conv_hubspot:n(r[1]),
+    conv_chatbot:n(r[2]),conv_total:n(r[3]),share_chatbot:n(r[4]),takeovers:n(r[5]),
+    solved_bot:n(r[6]),auto_bot:n(r[7]),auto_all:n(r[8]),savings:n(r[10])}));
+  const AG={Eli:[0,1,2],Jeanine:[6,7,8],Vivien:[12,13,14],Jan:[17,18,19]};
+  const tm=dataRows(parseCSV(tmT)).map(r=>{
+    const o={kw:Math.round(n(r[0]))};
+    for(const[a,[,mc,ac]]of Object.entries(AG))o[a]={messages:n(r[mc]),aht:n(r[ac])};
+    return o;});
+  const rf=dataRows(parseCSV(rfT)).map(r=>({kw:Math.round(n(r[0])),total:n(r[1]),
+    refund_tickets:n(r[2]),positive:n(r[3]),negative:n(r[4]),decline_rate:n(r[5]),
+    share:n(r[6]),net:n(r[7]),gross:n(r[8])}));
+  if(!hs.length)throw new Error('keine HubSpot-Daten');
+  return {hubspot:hs,moinai:ma,team:tm,refunds:rf,costs:DATA.costs,live:true};
+}
+async function fetchLive(){
+  const get=u=>fetch(u+'&_='+Date.now(),{cache:'no-store'})
+    .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.text();});
+  const[a,b,c,d]=await Promise.all([get(CSV_URLS.hubspot),get(CSV_URLS.moinai),
+    get(CSV_URLS.team),get(CSV_URLS.refunds)]);
+  return buildLiveData(a,b,c,d);
+}
+
+/* ---------- Key Metrics client-seitig berechnen ---------- */
+const MONTHS_DE=['','Januar','Februar','März','April','Mai','Juni','Juli',
+  'August','September','Oktober','November','Dezember'];
+function monthOfKW(kw){ // Monat des Donnerstags der ISO-Woche
+  const y=new Date().getFullYear();
+  const jan4=new Date(Date.UTC(y,0,4));
+  const mon1=new Date(jan4);mon1.setUTCDate(jan4.getUTCDate()-((jan4.getUTCDay()+6)%7));
+  const thu=new Date(mon1);thu.setUTCDate(mon1.getUTCDate()+(kw-1)*7+3);
+  return thu.getUTCMonth()+1;
+}
+function computeKeymetrics(D){
+  const grp=rows=>{const g={};rows.forEach(r=>{const m=monthOfKW(r.kw);
+    (g[m]=g[m]||[]).push(r);});return g;};
+  const ghs=grp(D.hubspot),gma=grp(D.moinai),grf=grp(D.refunds),gtm=grp(D.team);
+  const months=Object.keys(ghs).map(Number).sort((a,b)=>a-b);
+  if(!months.length)return null;
+  const nowM=new Date().getMonth()+1;
+  const done=months.filter(m=>m<nowM);
+  const sel=done.length?done[done.length-1]:months[months.length-1];
+  const avg=v=>{v=v.filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b)/v.length:null;};
+  const sum=v=>{v=v.filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b):null;};
+  const costsBy={};(D.costs||[]).forEach(c=>costsBy[c.month]=c);
+  function km(m){
+    if(m<1)return null;
+    const name=MONTHS_DE[m],hsr=ghs[m]||[],mar=gma[m]||[],rfr=grf[m]||[],tmr=gtm[m]||[];
+    const c=costsBy[name];
+    if(!hsr.length&&!c)return null;
+    let ws=0,wm=0;
+    tmr.forEach(r=>['Eli','Jeanine','Vivien','Jan'].forEach(a=>{
+      const mm=r[a].messages,ah=r[a].aht;
+      if(mm&&ah){ws+=mm*ah;wm+=mm;}}));
+    const th=c?c.tickets_hs:null,tc=c?c.tickets_cb:null;
+    return {month:name,tickets_hs:th,tickets_cb:tc,
+      tickets_total:(th||tc)?(th||0)+(tc||0):null,
+      mtfr:avg(hsr.map(r=>r.mtfr)),csat:avg(hsr.map(r=>r.csat)),
+      auto_all:avg(mar.map(r=>r.auto_all)),savings_rdr:sum(rfr.map(r=>r.net)),
+      cpt:c?c.cpt:null,aht:wm?ws/wm:null};
+  }
+  return {cur:km(sel),prev:km(sel-1),prev_month:sel>1?MONTHS_DE[sel-1]:null};
+}
+
 /* ---------- Build ---------- */
-const hs=DATA.hubspot, ma=DATA.moinai, tm=DATA.team, rf=DATA.refunds, co=DATA.costs;
+function renderAll(D){
+['kmtiles','tiles','sec-hubspot','sec-moinai','sec-team','sec-refunds','sec-costs']
+  .forEach(id=>document.getElementById(id).replaceChildren());
+const hs=D.hubspot, ma=D.moinai, tm=D.team, rf=D.refunds, co=D.costs;
 const kwl=hs.map(r=>'KW '+r.kw);
 const cur=hs[hs.length-1], prev=hs[hs.length-2]||{};
 const maC=ma[ma.length-1], maP=ma[ma.length-2]||{};
 const rfC=rf[rf.length-1], rfP=rf[rf.length-2]||{};
 const coC=co[co.length-1]||{};
 
+const standTxt=D.live
+  ?'Live aus Google Sheets · '+new Date().toLocaleString('de-DE',{dateStyle:'short',timeStyle:'short'})+' Uhr'
+  :`Stand: ${META.updated} (letzter Build)`;
 document.getElementById('subline').textContent=
-  `Aktuelle Woche: KW ${cur.kw} · Quelle: ${META.source} · Stand: ${META.updated}`;
+  `Aktuelle Woche: KW ${cur.kw} · ${standTxt}`;
 document.getElementById('footline').textContent=
-  `Automatisch generiert aus der KPI-Liste · Letztes Update: ${META.updated} · Zeitraum: KW ${hs[0].kw}–${cur.kw}`;
+  `Quelle: NeoTaste CS KPI-Liste (Google Sheets) · ${standTxt} · Zeitraum: KW ${hs[0].kw}–${cur.kw}`;
 
 /* Key Metrics (Monatssicht) */
-const KM=DATA.keymetrics;
+const KM=computeKeymetrics(D);
 if(KM&&KM.cur){
   const k=KM.cur,p=KM.prev||{};
   const vsLbl='vs. '+(KM.prev_month||'Vormonat');
@@ -606,12 +724,6 @@ if(KM&&KM.cur){
      delta:rel(k.aht,p.aht),goodWhen:'down',deltaLabel:vsLbl,
      sub:'Ø gewichtet über alle Agents'});
 }
-
-document.getElementById('reloadBtn').addEventListener('click',function(){
-  this.classList.add('spin');
-  // Cache-Buster erzwingt das Laden der neuesten veröffentlichten Version
-  location.replace(location.pathname+'?r='+Date.now());
-});
 
 document.getElementById('week-title').textContent='KW '+cur.kw;
 const tiles=document.getElementById('tiles');
@@ -766,6 +878,28 @@ chartCard(document.getElementById('sec-costs'),{
     series:[{name:'Gesamtkosten',color:C.s1,values:co.map(r=>r.total_cost),fmt:fmtEuro}]})
 });
 }
+} /* Ende renderAll */
+
+/* ---------- Start & Live-Refresh ---------- */
+const wrap=document.querySelector('.wrap');
+renderAll(DATA); // eingebettete Daten sofort zeigen — nie eine leere Seite
+
+async function refreshLive(){
+  const btn=document.getElementById('reloadBtn');
+  btn.classList.add('spin');
+  wrap.style.opacity='.55'; // vorherige Ansicht halten, kein Layout-Sprung
+  try{
+    const D=await fetchLive();
+    renderAll(D);
+  }catch(e){
+    console.warn('Live-Daten nicht erreichbar, zeige letzten Build:',e);
+  }finally{
+    wrap.style.opacity='';
+    btn.classList.remove('spin');
+  }
+}
+document.getElementById('reloadBtn').addEventListener('click',refreshLive);
+refreshLive(); // beim Öffnen automatisch aktuelle Zahlen laden
 </script>
 </body>
 </html>
