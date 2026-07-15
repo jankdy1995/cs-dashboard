@@ -186,7 +186,7 @@ function kmTile({label,value,delta,goodWhen,deltaLabel,sub,split}){
 }
 
 /* ---------- Generic SVG charts ---------- */
-const M={t:14,r:14,b:26,l:46}, W=560, H=240;
+const M={t:20,r:14,b:26,l:46}, W=560, H=240;
 
 function makeSvg(){const s=document.createElementNS('http://www.w3.org/2000/svg','svg');
   s.setAttribute('viewBox',`0 0 ${W} ${H}`);return s;}
@@ -301,7 +301,7 @@ function tooltipFor(chartEl){
 }
 
 /* Line chart: series=[{name,color,values,fmt}], area: Flächen-Variante */
-function lineChart(el,{labels,series,yFmt,labelLast,area}){
+function lineChart(el,{labels,series,yFmt,labelSeries,area}){
   const svg=makeSvg();el.append(svg);
   const max=Math.max(...series.flatMap(s=>s.values.filter(v=>v!=null)));
   const y=frame(svg,max,yFmt);
@@ -330,11 +330,16 @@ function lineChart(el,{labels,series,yFmt,labelLast,area}){
       c.setAttribute('cx',p[0]);c.setAttribute('cy',p[1]);c.setAttribute('r',4);
       c.setAttribute('fill',s.color);c.setAttribute('stroke',css('--surface-1'));
       c.setAttribute('stroke-width',2);svg.append(c);});
-    if(labelLast){
-      const li=s.values.length-1,v=s.values[li];
-      if(v!=null)text(svg,x(li)-6,y(v)-9,(s.fmt||yFmt)(v),'end',11,css('--ink-1'))
-        .setAttribute('font-weight','650');
-    }
+  });
+  // Werte an jeder KW: bei einer Serie diese, bei mehreren die Hauptserie
+  const li=labelSeries!=null?labelSeries:0;
+  const ls=series[Math.min(li,series.length-1)];
+  ls.values.forEach((v,i)=>{
+    if(v==null)return;
+    const anchor=i===0?'start':(i===labels.length-1?'end':'middle');
+    const dx=i===0?-4:(i===labels.length-1?4:0);
+    text(svg,x(i)+dx,y(v)-9,(ls.fmt||yFmt)(v),anchor,10,css('--ink-1'))
+      .setAttribute('font-weight','600');
   });
   const tt=tooltipFor(el);
   svg.addEventListener('pointermove',e=>{
@@ -439,9 +444,9 @@ function barChart(el,{labels,series,yFmt,totalLabelLast}){
       svg.append(r);
       y0=top;
     });
-    if(totalLabelLast&&i===labels.length-1)
-      text(svg,cx,y0-6,fmtN(totals[i]),'middle',11,css('--ink-1'))
-        .setAttribute('font-weight','650');
+    // Gesamtwert über jeder Säule
+    text(svg,cx,y0-6,(series.length===1?(series[0].fmt||yFmt):fmtN)(totals[i]),
+      'middle',10,css('--ink-1')).setAttribute('font-weight','600');
     // Hit target: ganze Band-Spalte
     const hit=document.createElementNS(svg.namespaceURI,'rect');
     hit.setAttribute('x',M.l+band*i);hit.setAttribute('y',M.t);
@@ -684,7 +689,7 @@ chartCard(document.getElementById('sec-moinai'),{
           {name:'Alle Tickets',color:C.s2,type:'line'}],
   table:{cols:['KW','Chatbot','Alle Tickets'],
     rows:ma.map(r=>['KW '+r.kw,fmtP(r.auto_bot),fmtP(r.auto_all)])},
-  spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',
+  spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',labelSeries:1,
     series:[{name:'Chatbot',color:C.s1,values:ma.map(r=>r.auto_bot),fmt:fmtP},
             {name:'Alle Tickets',color:C.s2,values:ma.map(r=>r.auto_all),fmt:fmtP}]}
 });
