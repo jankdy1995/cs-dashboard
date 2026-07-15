@@ -29,8 +29,17 @@
   body{margin:0;background:var(--page);color:var(--ink-1);
     font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;}
   .wrap{max-width:1240px;margin:0 auto;padding:28px 24px 48px;}
+  header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;}
   header h1{font-size:21px;margin:0 0 2px;font-weight:650;}
   header .sub{color:var(--ink-3);font-size:13px;}
+  .reload-btn{flex:none;display:inline-flex;align-items:center;gap:7px;
+    background:var(--surface-1);border:1px solid var(--border);border-radius:8px;
+    color:var(--ink-2);font:13px/1 system-ui,-apple-system,"Segoe UI",sans-serif;
+    padding:9px 14px;cursor:pointer;}
+  .reload-btn:hover{color:var(--ink-1);border-color:var(--baseline);}
+  .reload-btn svg{width:14px;height:14px;stroke:currentColor;}
+  .reload-btn.spin svg{animation:rot .8s linear infinite;}
+  @keyframes rot{to{transform:rotate(360deg)}}
   .section-title{font-size:15px;font-weight:650;margin:34px 0 12px;
     display:flex;align-items:center;gap:8px;}
   .section-title .rule{flex:1;height:1px;background:var(--grid);}
@@ -85,8 +94,16 @@
 <body>
 <div class="wrap">
   <header>
-    <h1>NeoTaste · Customer Success Dashboard</h1>
-    <div class="sub" id="subline"></div>
+    <div>
+      <h1>NeoTaste · Customer Success Dashboard</h1>
+      <div class="sub" id="subline"></div>
+    </div>
+    <button class="reload-btn" id="reloadBtn" title="Neueste veröffentlichte Version laden">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round">
+        <path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/>
+      </svg>
+      Aktualisieren
+    </button>
   </header>
 
   <div class="section-title">⭐ Key Metrics — <span id="km-title"></span><span class="rule"></span></div>
@@ -396,6 +413,12 @@ if(KM&&KM.cur){
      delta:rel(k.aht,p.aht),goodWhen:'down',deltaLabel:vsLbl,
      sub:'Ø gewichtet über alle Agents'});
 }
+
+document.getElementById('reloadBtn').addEventListener('click',function(){
+  this.classList.add('spin');
+  // Cache-Buster erzwingt das Laden der neuesten veröffentlichten Version
+  location.replace(location.pathname+'?r='+Date.now());
+});
 
 document.getElementById('week-title').textContent='KW '+cur.kw;
 const tiles=document.getElementById('tiles');
