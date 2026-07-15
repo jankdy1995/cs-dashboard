@@ -204,7 +204,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     --grid:#e1e0d9; --baseline:#c3c2b7;
     --border:rgba(11,11,11,.10);
     --s1:#2a78d6; --s2:#1baf7a; --s3:#eda100; --s4:#008300;
-    --s5:#4a3aa7; --s6:#e34948;
+    --s5:#4a3aa7; --s6:#e34948; --s7:#e87ba4; --s8:#eb6834;
     --good:#006300; --bad:#d03b3b;
   }
   @media (prefers-color-scheme: dark){
@@ -214,7 +214,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       --grid:#2c2c2a; --baseline:#383835;
       --border:rgba(255,255,255,.10);
       --s1:#3987e5; --s2:#199e70; --s3:#c98500; --s4:#008300;
-      --s5:#9085e9; --s6:#e66767;
+      --s5:#9085e9; --s6:#e66767; --s7:#d55181; --s8:#d95926;
       --good:#0ca30c; --bad:#e66767;
     }
   }
@@ -257,9 +257,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   .card h3{margin:0;font-size:13.5px;font-weight:650;}
   .card .hint{color:var(--ink-3);font-size:12px;margin:1px 0 8px;}
   .card-head{display:flex;justify-content:space-between;align-items:flex-start;}
-  .tbl-btn{background:none;border:1px solid var(--border);border-radius:6px;
-    color:var(--ink-3);font-size:11.5px;padding:3px 8px;cursor:pointer;}
-  .tbl-btn:hover{color:var(--ink-1)}
+  .view-sel{background:var(--surface-1);border:1px solid var(--border);
+    border-radius:6px;color:var(--ink-2);font-size:11.5px;padding:3px 6px;
+    cursor:pointer;font-family:inherit;}
+  .view-sel:hover{color:var(--ink-1);border-color:var(--baseline);}
   .legend{display:flex;flex-wrap:wrap;gap:14px;margin:2px 0 6px;
     font-size:12px;color:var(--ink-2);}
   .legend .key{display:inline-flex;align-items:center;gap:6px;}
@@ -408,32 +409,55 @@ function frame(svg,ymax,yFmt){
   return y;
 }
 
-function chartCard(parent,{title,hint,width,legend,build,table}){
+const VIEWS=[['linie','Linie'],['balken','Balken'],['flaeche','Fläche'],
+             ['kreis','Kreis'],['tabelle','Tabelle']];
+function chartCard(parent,{title,hint,width,legend,spec,table}){
   const card=document.createElement('div');card.className='card'+(width?' '+width:'');
   const head=document.createElement('div');head.className='card-head';
   const hwrap=document.createElement('div');
   const h=document.createElement('h3');h.textContent=title;hwrap.append(h);
   if(hint){const p=document.createElement('div');p.className='hint';p.textContent=hint;hwrap.append(p);}
-  head.append(hwrap);
-  const btn=document.createElement('button');btn.className='tbl-btn';btn.textContent='Tabelle';
-  head.append(btn);card.append(head);
-  if(legend&&legend.length>1){
-    const lg=document.createElement('div');lg.className='legend';
-    legend.forEach(k=>{const key=document.createElement('span');key.className='key';
-      const sw=document.createElement('span');sw.className=k.type==='line'?'lkey':'swatch';
-      sw.style.background=k.color;
-      key.append(sw,document.createTextNode(k.name));lg.append(key);});
-    card.append(lg);
-  }
+  const sel=document.createElement('select');sel.className='view-sel';
+  sel.title='Darstellung wählen';
+  VIEWS.forEach(([v,lbl])=>{const o=document.createElement('option');
+    o.value=v;o.textContent=lbl;sel.append(o);});
+  head.append(hwrap,sel);card.append(head);
+  const legEl=document.createElement('div');legEl.className='legend';card.append(legEl);
   const chartEl=document.createElement('div');chartEl.className='chart';card.append(chartEl);
   const tblEl=document.createElement('div');tblEl.style.display='none';card.append(tblEl);
   buildTable(tblEl,table);
-  build(chartEl);
-  btn.addEventListener('click',()=>{
-    const show=tblEl.style.display==='none';
-    tblEl.style.display=show?'':'none';chartEl.style.display=show?'none':'';
-    btn.textContent=show?'Chart':'Tabelle';
+
+  // Ansicht aus URL wiederherstellen (teilbare Links)
+  const slug='v-'+title.toLowerCase().replace(/[^a-z0-9äöüß]+/g,'-').replace(/^-+|-+$/g,'');
+  const fromUrl=new URLSearchParams(location.search).get(slug);
+  let view=VIEWS.some(([v])=>v===fromUrl)?fromUrl:(spec.defaultView||'linie');
+  sel.value=view;
+
+  function setLegend(items){
+    legEl.replaceChildren();
+    if(!items||items.length<2)return;
+    items.forEach(k=>{const key=document.createElement('span');key.className='key';
+      const sw=document.createElement('span');sw.className=k.type==='line'?'lkey':'swatch';
+      sw.style.background=k.color;
+      key.append(sw,document.createTextNode(k.name));legEl.append(key);});
+  }
+  function render(){
+    chartEl.replaceChildren();
+    chartEl.style.display='';tblEl.style.display='none';
+    if(view==='tabelle'){chartEl.style.display='none';tblEl.style.display='';
+      setLegend(null);return;}
+    if(view==='kreis'){setLegend(pieChart(chartEl,spec));return;}
+    setLegend(legend);
+    if(view==='balken')barChart(chartEl,spec);
+    else lineChart(chartEl,Object.assign({},spec,{area:view==='flaeche'}));
+  }
+  sel.addEventListener('change',()=>{
+    view=sel.value;
+    const u=new URL(location);u.searchParams.set(slug,view);
+    history.replaceState(null,'',u);
+    render();
   });
+  render();
   parent.append(card);
 }
 function buildTable(el,{cols,rows}){
@@ -469,14 +493,23 @@ function tooltipFor(chartEl){
   };
 }
 
-/* Line chart: series=[{name,color,values,fmt}] */
-function lineChart(el,{labels,series,yFmt,labelLast}){
+/* Line chart: series=[{name,color,values,fmt}], area: Flächen-Variante */
+function lineChart(el,{labels,series,yFmt,labelLast,area}){
   const svg=makeSvg();el.append(svg);
   const max=Math.max(...series.flatMap(s=>s.values.filter(v=>v!=null)));
   const y=frame(svg,max,yFmt);
   const x=i=>M.l+(labels.length===1?0.5:(i/(labels.length-1)))*(W-M.l-M.r);
   labels.forEach((lb,i)=>text(svg,x(i),H-M.b+15,lb,'middle'));
   const cross=line(svg,0,M.t,0,H-M.b,css('--baseline'),1);cross.setAttribute('opacity','0');
+  if(area)series.forEach(s=>{ // Flächen zuerst, damit Linien darüber liegen
+    const pts=s.values.map((v,i)=>v==null?null:[x(i),y(v)]).filter(Boolean);
+    if(pts.length<2)return;
+    const d='M'+pts.map(p=>p[0]+' '+p[1]).join(' L ')+
+      ` L${pts[pts.length-1][0]},${H-M.b} L${pts[0][0]},${H-M.b} Z`;
+    const a=document.createElementNS(svg.namespaceURI,'path');
+    a.setAttribute('d',d);a.setAttribute('fill',s.color);
+    a.setAttribute('opacity','0.12');svg.append(a);
+  });
   series.forEach(s=>{
     const pts=s.values.map((v,i)=>v==null?null:[x(i),y(v)]);
     const d=pts.map((p,i)=>p?((i===0||!pts[i-1])?'M':'L')+p[0]+' '+p[1]:'').join(' ');
@@ -509,6 +542,65 @@ function lineChart(el,{labels,series,yFmt,labelLast}){
         value:(s.fmt||yFmt)(s.values[best])})));
   });
   svg.addEventListener('pointerleave',()=>{tt.hide();cross.setAttribute('opacity','0');});
+}
+
+/* Pie/Donut: mehrere Serien → Anteil je Serie (Summe über den Zeitraum);
+   eine Serie → Anteil je Zeitpunkt (KW/Monat). Gibt Legenden-Einträge zurück. */
+function pieChart(el,{labels,series,yFmt}){
+  const PAL=['--s1','--s2','--s3','--s4','--s5','--s6','--s7','--s8'].map(css);
+  const sum=v=>v.filter(x=>x!=null).reduce((a,b)=>a+b,0);
+  let data;
+  if(series.length>1){
+    data=series.map(s=>({name:s.name,color:s.color,value:sum(s.values),
+      fmt:s.fmt||yFmt}));
+  }else{
+    data=labels.map((lb,i)=>({name:lb,color:PAL[i%8],
+      value:series[0].values[i],fmt:series[0].fmt||yFmt}));
+    if(data.length>8){ // Farbslots nicht über 8 hinaus recyceln
+      const rest=data.slice(7);
+      data=data.slice(0,7);
+      data.push({name:'Weitere',color:PAL[7],value:sum(rest.map(d=>d.value)),
+        fmt:series[0].fmt||yFmt});
+    }
+  }
+  data=data.filter(d=>d.value!=null&&d.value>0);
+  const total=sum(data.map(d=>d.value));
+  if(!total){el.textContent='Keine Daten';return [];}
+  const svg=makeSvg();el.append(svg);
+  const cx=W/2, cy=(H-6)/2, R=Math.min(W,H)/2-16, ri=R*0.62;
+  const tt=tooltipFor(el);
+  let a0=-Math.PI/2;
+  data.forEach(d=>{
+    const frac=d.value/total, a1=a0+frac*2*Math.PI;
+    const p=(a,r)=>[cx+r*Math.cos(a),cy+r*Math.sin(a)];
+    const [x0,y0]=p(a0,R),[x1,y1]=p(a1,R),[x2,y2]=p(a1,ri),[x3,y3]=p(a0,ri);
+    const big=frac>0.5?1:0;
+    const path=document.createElementNS(svg.namespaceURI,'path');
+    path.setAttribute('d',`M${x0},${y0} A${R},${R} 0 ${big} 1 ${x1},${y1} `+
+      `L${x2},${y2} A${ri},${ri} 0 ${big} 0 ${x3},${y3} Z`);
+    path.setAttribute('fill',d.color);
+    path.setAttribute('stroke',css('--surface-1'));   // 2px Surface-Gap
+    path.setAttribute('stroke-width',2);
+    path.addEventListener('pointermove',e=>{
+      const rc=svg.getBoundingClientRect();
+      tt.show(e.clientX-rc.left,e.clientY-rc.top,d.name,[
+        {name:'Wert',color:d.color,value:d.fmt(d.value)},
+        {name:'Anteil',color:'transparent',
+         value:(frac*100).toLocaleString('de-DE',{maximumFractionDigits:1})+' %'}]);
+    });
+    path.addEventListener('pointerleave',()=>tt.hide());
+    svg.append(path);
+    if(frac>=0.06){ // nur größere Segmente direkt beschriften
+      const [lx,ly]=p((a0+a1)/2,(R+ri)/2);
+      text(svg,lx,ly+3.5,Math.round(frac*100)+' %','middle',10.5,'#ffffff')
+        .setAttribute('font-weight','650');
+    }
+    a0=a1;
+  });
+  text(svg,cx,cy-2,yFmt(total),'middle',15,css('--ink-1'))
+    .setAttribute('font-weight','650');
+  text(svg,cx,cy+14,'Gesamt','middle',10.5);
+  return data.map(d=>({name:d.name,color:d.color}));
 }
 
 /* Bar chart, optionally stacked: series=[{name,color,values,fmt}] */
@@ -746,27 +838,27 @@ chartCard(document.getElementById('sec-hubspot'),{
   legend:[{name:'User',color:C.s1},{name:'Partner',color:C.s2}],
   table:{cols:['KW','User','Partner','Gesamt'],
     rows:hs.map(r=>['KW '+r.kw,fmtN(r.user),fmtN(r.partner),fmtN(r.created)])},
-  build:el=>barChart(el,{labels:kwl,yFmt:fmtN,totalLabelLast:true,
+  spec:{defaultView:'balken',labels:kwl,yFmt:fmtN,totalLabelLast:true,
     series:[{name:'User',color:C.s1,values:hs.map(r=>r.user)},
-            {name:'Partner',color:C.s2,values:hs.map(r=>r.partner)}]})
+            {name:'Partner',color:C.s2,values:hs.map(r=>r.partner)}]}
 });
 chartCard(document.getElementById('sec-hubspot'),{
   title:'CSAT pro Woche',hint:'Anteil zufriedener Bewertungen',
   table:{cols:['KW','CSAT'],rows:hs.map(r=>['KW '+r.kw,fmtP(r.csat)])},
-  build:el=>lineChart(el,{labels:kwl,yFmt:v=>Math.round(v*100)+' %',labelLast:true,
-    series:[{name:'CSAT',color:C.s1,values:hs.map(r=>r.csat),fmt:fmtP}]})
+  spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',labelLast:true,
+    series:[{name:'CSAT',color:C.s1,values:hs.map(r=>r.csat),fmt:fmtP}]}
 });
 chartCard(document.getElementById('sec-hubspot'),{
   title:'Median First Reply Time',hint:'Stunden bis zur ersten Antwort (Median)',
   table:{cols:['KW','MTFR (h)'],rows:hs.map(r=>['KW '+r.kw,fmtH(r.mtfr)])},
-  build:el=>lineChart(el,{labels:kwl,yFmt:v=>v+' h',labelLast:true,
-    series:[{name:'MTFR',color:C.s1,values:hs.map(r=>r.mtfr),fmt:fmtH}]})
+  spec:{defaultView:'linie',labels:kwl,yFmt:v=>v+' h',labelLast:true,
+    series:[{name:'MTFR',color:C.s1,values:hs.map(r=>r.mtfr),fmt:fmtH}]}
 });
 chartCard(document.getElementById('sec-hubspot'),{
   title:'Messages pro Woche',hint:'Vom Team gesendete Nachrichten',
   table:{cols:['KW','Messages'],rows:hs.map(r=>['KW '+r.kw,fmtN(r.messages)])},
-  build:el=>lineChart(el,{labels:kwl,yFmt:fmtN,labelLast:true,
-    series:[{name:'Messages',color:C.s1,values:hs.map(r=>r.messages),fmt:fmtN}]})
+  spec:{defaultView:'linie',labels:kwl,yFmt:fmtN,labelLast:true,
+    series:[{name:'Messages',color:C.s1,values:hs.map(r=>r.messages),fmt:fmtN}]}
 });
 
 /* MoinAI */
@@ -775,9 +867,9 @@ chartCard(document.getElementById('sec-moinai'),{
   legend:[{name:'HubSpot',color:C.s1},{name:'Chatbot',color:C.s2}],
   table:{cols:['KW','HubSpot','Chatbot','Gesamt'],
     rows:ma.map(r=>['KW '+r.kw,fmtN(r.conv_hubspot),fmtN(r.conv_chatbot),fmtN(r.conv_total)])},
-  build:el=>barChart(el,{labels:kwl,yFmt:fmtN,totalLabelLast:true,
+  spec:{defaultView:'balken',labels:kwl,yFmt:fmtN,totalLabelLast:true,
     series:[{name:'HubSpot',color:C.s1,values:ma.map(r=>r.conv_hubspot)},
-            {name:'Chatbot',color:C.s2,values:ma.map(r=>r.conv_chatbot)}]})
+            {name:'Chatbot',color:C.s2,values:ma.map(r=>r.conv_chatbot)}]}
 });
 chartCard(document.getElementById('sec-moinai'),{
   title:'Automation Rate',hint:'Anteil automatisch gelöster Anfragen',
@@ -785,21 +877,21 @@ chartCard(document.getElementById('sec-moinai'),{
           {name:'Alle Tickets',color:C.s2,type:'line'}],
   table:{cols:['KW','Chatbot','Alle Tickets'],
     rows:ma.map(r=>['KW '+r.kw,fmtP(r.auto_bot),fmtP(r.auto_all)])},
-  build:el=>lineChart(el,{labels:kwl,yFmt:v=>Math.round(v*100)+' %',
+  spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',
     series:[{name:'Chatbot',color:C.s1,values:ma.map(r=>r.auto_bot),fmt:fmtP},
-            {name:'Alle Tickets',color:C.s2,values:ma.map(r=>r.auto_all),fmt:fmtP}]})
+            {name:'Alle Tickets',color:C.s2,values:ma.map(r=>r.auto_all),fmt:fmtP}]}
 });
 chartCard(document.getElementById('sec-moinai'),{
   title:'Weekly Savings',hint:'Ersparnis durch Chatbot-Automatisierung',
   table:{cols:['KW','Savings'],rows:ma.map(r=>['KW '+r.kw,fmtEuro(r.savings)])},
-  build:el=>barChart(el,{labels:kwl,yFmt:v=>fmtN(v),totalLabelLast:true,
-    series:[{name:'Savings',color:C.s2,values:ma.map(r=>r.savings),fmt:fmtEuro}]})
+  spec:{defaultView:'balken',labels:kwl,yFmt:v=>fmtN(v),totalLabelLast:true,
+    series:[{name:'Savings',color:C.s2,values:ma.map(r=>r.savings),fmt:fmtEuro}]}
 });
 chartCard(document.getElementById('sec-moinai'),{
   title:'Takeovers pro Woche',hint:'Konversationen mit Übernahme durch das Team',
   table:{cols:['KW','Takeovers'],rows:ma.map(r=>['KW '+r.kw,fmtN(r.takeovers)])},
-  build:el=>lineChart(el,{labels:kwl,yFmt:fmtN,labelLast:true,
-    series:[{name:'Takeovers',color:C.s1,values:ma.map(r=>r.takeovers),fmt:fmtN}]})
+  spec:{defaultView:'linie',labels:kwl,yFmt:fmtN,labelLast:true,
+    series:[{name:'Takeovers',color:C.s1,values:ma.map(r=>r.takeovers),fmt:fmtN}]}
 });
 
 /* Team */
@@ -810,18 +902,18 @@ chartCard(document.getElementById('sec-team'),{
   legend:agents.map((a,i)=>({name:a,color:agentColors[i],type:'line'})),
   table:{cols:['KW',...agents],
     rows:tm.map(r=>['KW '+r.kw,...agents.map(a=>fmtN(r[a].messages))])},
-  build:el=>lineChart(el,{labels:tm.map(r=>'KW '+r.kw),yFmt:fmtN,
+  spec:{defaultView:'linie',labels:tm.map(r=>'KW '+r.kw),yFmt:fmtN,
     series:agents.map((a,i)=>({name:a,color:agentColors[i],
-      values:tm.map(r=>r[a].messages),fmt:fmtN}))})
+      values:tm.map(r=>r[a].messages),fmt:fmtN}))}
 });
 chartCard(document.getElementById('sec-team'),{
   title:'Ø Handling Time pro Agent',hint:'Minuten pro Vorgang',
   legend:agents.map((a,i)=>({name:a,color:agentColors[i],type:'line'})),
   table:{cols:['KW',...agents],
     rows:tm.map(r=>['KW '+r.kw,...agents.map(a=>fmtMin(r[a].aht))])},
-  build:el=>lineChart(el,{labels:tm.map(r=>'KW '+r.kw),yFmt:v=>v+' min',
+  spec:{defaultView:'linie',labels:tm.map(r=>'KW '+r.kw),yFmt:v=>v+' min',
     series:agents.map((a,i)=>({name:a,color:agentColors[i],
-      values:tm.map(r=>r[a].aht),fmt:fmtMin}))})
+      values:tm.map(r=>r[a].aht),fmt:fmtMin}))}
 });
 
 /* Refunds */
@@ -831,30 +923,30 @@ chartCard(document.getElementById('sec-refunds'),{
   table:{cols:['KW','Abgelehnt','Erstattet','Gesamt','Decline Rate'],
     rows:rf.map(r=>['KW '+r.kw,fmtN(r.negative),fmtN(r.positive),
       fmtN(r.refund_tickets),fmtP(r.decline_rate)])},
-  build:el=>barChart(el,{labels:kwl,yFmt:fmtN,totalLabelLast:true,
+  spec:{defaultView:'balken',labels:kwl,yFmt:fmtN,totalLabelLast:true,
     series:[{name:'Abgelehnt',color:C.s1,values:rf.map(r=>r.negative)},
-            {name:'Erstattet',color:C.s2,values:rf.map(r=>r.positive)}]})
+            {name:'Erstattet',color:C.s2,values:rf.map(r=>r.positive)}]}
 });
 chartCard(document.getElementById('sec-refunds'),{
   title:'Refund Decline Rate',hint:'Anteil abgelehnter Refund-Anfragen',
   table:{cols:['KW','Decline Rate'],rows:rf.map(r=>['KW '+r.kw,fmtP(r.decline_rate)])},
-  build:el=>lineChart(el,{labels:kwl,yFmt:v=>Math.round(v*100)+' %',labelLast:true,
-    series:[{name:'Decline Rate',color:C.s1,values:rf.map(r=>r.decline_rate),fmt:fmtP}]})
+  spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',labelLast:true,
+    series:[{name:'Decline Rate',color:C.s1,values:rf.map(r=>r.decline_rate),fmt:fmtP}]}
 });
 chartCard(document.getElementById('sec-refunds'),{
   title:'Money Contribution',hint:'Durch abgelehnte Refunds gesichertes Geld',
   legend:[{name:'Netto',color:C.s1,type:'line'},{name:'Brutto',color:C.s2,type:'line'}],
   table:{cols:['KW','Netto','Brutto'],
     rows:rf.map(r=>['KW '+r.kw,fmtEuro(r.net),fmtEuro(r.gross)])},
-  build:el=>lineChart(el,{labels:kwl,yFmt:fmtN,
+  spec:{defaultView:'linie',labels:kwl,yFmt:fmtN,
     series:[{name:'Netto',color:C.s1,values:rf.map(r=>r.net),fmt:fmtEuro},
-            {name:'Brutto',color:C.s2,values:rf.map(r=>r.gross),fmt:fmtEuro}]})
+            {name:'Brutto',color:C.s2,values:rf.map(r=>r.gross),fmt:fmtEuro}]}
 });
 chartCard(document.getElementById('sec-refunds'),{
   title:'Share of Refund Tickets',hint:'Anteil der Refund-Tickets am Gesamtvolumen',
   table:{cols:['KW','Anteil'],rows:rf.map(r=>['KW '+r.kw,fmtP(r.share)])},
-  build:el=>lineChart(el,{labels:kwl,yFmt:v=>Math.round(v*100)+' %',labelLast:true,
-    series:[{name:'Anteil',color:C.s1,values:rf.map(r=>r.share),fmt:fmtP}]})
+  spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',labelLast:true,
+    series:[{name:'Anteil',color:C.s1,values:rf.map(r=>r.share),fmt:fmtP}]}
 });
 
 /* Costs */
@@ -867,15 +959,15 @@ chartCard(document.getElementById('sec-costs'),{
       rows:co.map(r=>[r.month,fmtN(r.tickets),fmtEuro2(r.cpt)])}
     :{cols:['Monat','Kosten gesamt','Tickets','CPT'],
       rows:co.map(r=>[r.month,fmtEuro(r.total_cost),fmtN(r.tickets),fmtEuro2(r.cpt)])},
-  build:el=>lineChart(el,{labels:coL,yFmt:v=>v+' €',labelLast:true,
-    series:[{name:'CPT',color:C.s1,values:co.map(r=>r.cpt),fmt:fmtEuro2}]})
+  spec:{defaultView:'linie',labels:coL,yFmt:v=>v+' €',labelLast:true,
+    series:[{name:'CPT',color:C.s1,values:co.map(r=>r.cpt),fmt:fmtEuro2}]}
 });
 if(!META.public){
 chartCard(document.getElementById('sec-costs'),{
   title:'CST-Gesamtkosten (monatlich)',hint:'Team + MoinAI Flat Fee, brutto',
   table:{cols:['Monat','Gesamtkosten'],rows:co.map(r=>[r.month,fmtEuro(r.total_cost)])},
-  build:el=>barChart(el,{labels:coL,yFmt:fmtN,totalLabelLast:true,
-    series:[{name:'Gesamtkosten',color:C.s1,values:co.map(r=>r.total_cost),fmt:fmtEuro}]})
+  spec:{defaultView:'balken',labels:coL,yFmt:fmtN,totalLabelLast:true,
+    series:[{name:'Gesamtkosten',color:C.s1,values:co.map(r=>r.total_cost),fmt:fmtEuro}]}
 });
 }
 } /* Ende renderAll */
