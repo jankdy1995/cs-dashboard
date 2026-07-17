@@ -42,7 +42,29 @@
   @keyframes rot{to{transform:rotate(360deg)}}
   .section-title{font-size:15px;font-weight:650;margin:34px 0 12px;
     display:flex;align-items:center;gap:8px;}
+  .section-title::before{content:'';flex:none;width:5px;height:16px;
+    border-radius:3px;background:var(--acc,var(--baseline));}
   .section-title .rule{flex:1;height:1px;background:var(--grid);}
+  /* Sektions-Akzente */
+  #sec-hubspot .card{border-top:3px solid var(--s1);}
+  #sec-moinai .card{border-top:3px solid var(--s2);}
+  #sec-team .card{border-top:3px solid var(--s5);}
+  #sec-refunds .card{border-top:3px solid var(--s8);}
+  #sec-costs .card{border-top:3px solid var(--s3);}
+  /* Kachel-Akzente (dezent getönt) */
+  .tiles .tile:nth-child(8n+1){border-top:3px solid var(--s1);background:color-mix(in srgb,var(--s1) 5%,var(--surface-1));}
+  .tiles .tile:nth-child(8n+2){border-top:3px solid var(--s2);background:color-mix(in srgb,var(--s2) 5%,var(--surface-1));}
+  .tiles .tile:nth-child(8n+3){border-top:3px solid var(--s3);background:color-mix(in srgb,var(--s3) 5%,var(--surface-1));}
+  .tiles .tile:nth-child(8n+4){border-top:3px solid var(--s5);background:color-mix(in srgb,var(--s5) 5%,var(--surface-1));}
+  .tiles .tile:nth-child(8n+5){border-top:3px solid var(--s6);background:color-mix(in srgb,var(--s6) 5%,var(--surface-1));}
+  .tiles .tile:nth-child(8n+6){border-top:3px solid var(--s7);background:color-mix(in srgb,var(--s7) 5%,var(--surface-1));}
+  .tiles .tile:nth-child(8n+7){border-top:3px solid var(--s8);background:color-mix(in srgb,var(--s8) 5%,var(--surface-1));}
+  .tiles .tile:nth-child(8n+8){border-top:3px solid var(--s4);background:color-mix(in srgb,var(--s4) 5%,var(--surface-1));}
+  .hdr-controls{display:flex;gap:8px;flex:none;align-items:center;}
+  .period-sel{background:var(--surface-1);border:1px solid var(--border);
+    border-radius:8px;color:var(--ink-2);font:13px system-ui,-apple-system,"Segoe UI",sans-serif;
+    padding:9px 10px;cursor:pointer;}
+  .period-sel:hover{color:var(--ink-1);border-color:var(--baseline);}
   .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));
     gap:12px;margin-top:18px;}
   .tile{background:var(--surface-1);border:1px solid var(--border);
@@ -99,33 +121,40 @@
       <h1>NeoTaste · Customer Success Dashboard</h1>
       <div class="sub" id="subline"></div>
     </div>
-    <button class="reload-btn" id="reloadBtn" title="Neueste veröffentlichte Version laden">
-      <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round">
-        <path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/>
-      </svg>
-      Aktualisieren
-    </button>
+    <div class="hdr-controls">
+      <select class="period-sel" id="periodSel" title="Zeitraum wählen">
+        <option value="woche">Wöchentlich</option>
+        <option value="monat">Monatlich</option>
+        <option value="jahr">Jährlich</option>
+      </select>
+      <button class="reload-btn" id="reloadBtn" title="Aktuelle Zahlen laden">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round">
+          <path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/>
+        </svg>
+        Aktualisieren
+      </button>
+    </div>
   </header>
 
-  <div class="section-title">⭐ Key Metrics — <span id="km-title"></span><span class="rule"></span></div>
+  <div class="section-title" style="--acc:var(--s3)">⭐ Key Metrics — <span id="km-title"></span><span class="rule"></span></div>
   <div class="tiles km" id="kmtiles"></div>
 
-  <div class="section-title">📆 Aktuelle Woche — <span id="week-title"></span><span class="rule"></span></div>
+  <div class="section-title" style="--acc:var(--s1)">📆 Aktuelle Woche — <span id="week-title"></span><span class="rule"></span></div>
   <div class="tiles" id="tiles"></div>
 
-  <div class="section-title">🎫 Tickets &amp; Support (HubSpot)<span class="rule"></span></div>
+  <div class="section-title" style="--acc:var(--s1)">🎫 Tickets &amp; Support (HubSpot)<span class="rule"></span></div>
   <div class="grid" id="sec-hubspot"></div>
 
-  <div class="section-title">🤖 Chatbot (MoinAI)<span class="rule"></span></div>
+  <div class="section-title" style="--acc:var(--s2)">🤖 Chatbot (MoinAI)<span class="rule"></span></div>
   <div class="grid" id="sec-moinai"></div>
 
-  <div class="section-title">👥 Team Performance<span class="rule"></span></div>
+  <div class="section-title" style="--acc:var(--s5)">👥 Team Performance<span class="rule"></span></div>
   <div class="grid" id="sec-team"></div>
 
-  <div class="section-title">💸 Refunds<span class="rule"></span></div>
+  <div class="section-title" style="--acc:var(--s8)">💸 Refunds<span class="rule"></span></div>
   <div class="grid" id="sec-refunds"></div>
 
-  <div class="section-title">💰 Kosten<span class="rule"></span></div>
+  <div class="section-title" style="--acc:var(--s3)">💰 Kosten<span class="rule"></span></div>
   <div class="grid" id="sec-costs"></div>
 
   <div class="foot" id="footline"></div>
@@ -133,7 +162,7 @@
 
 <script>
 const DATA = {"hubspot": [{"kw": 23, "created": 1046.0, "user": 857.0, "partner": 189.0, "messages": 1526.0, "csat": 0.4, "mtfr": 18.1, "msg_per_ticket": 0.6854521625}, {"kw": 24, "created": 988.0, "user": 841.0, "partner": 147.0, "messages": 1386.0, "csat": 0.55, "mtfr": 12.1, "msg_per_ticket": 0.7128427128}, {"kw": 25, "created": 1036.0, "user": 815.0, "partner": 221.0, "messages": 1338.0, "csat": 0.4, "mtfr": 13.7, "msg_per_ticket": 0.7742899851}, {"kw": 26, "created": 1055.0, "user": 940.0, "partner": 115.0, "messages": 1636.0, "csat": 0.4, "mtfr": 15.8, "msg_per_ticket": 0.6448655257}, {"kw": 27, "created": 1155.0, "user": 903.0, "partner": 252.0, "messages": 1515.0, "csat": 0.4, "mtfr": 15.6, "msg_per_ticket": 0.7623762376}], "moinai": [{"kw": 23, "conv_hubspot": 1046.0, "conv_chatbot": 624.0, "conv_total": 1670.0, "share_chatbot": 0.3736526946, "takeovers": 230.0, "solved_bot": 394.0, "auto_bot": 0.6314102564, "auto_all": 0.2359281437, "cost_per_ticket": 3.205128205, "savings": 8839.74359}, {"kw": 24, "conv_hubspot": 988.0, "conv_chatbot": 600.0, "conv_total": 1588.0, "share_chatbot": 0.3778337531, "takeovers": 228.0, "solved_bot": 372.0, "auto_bot": 0.62, "auto_all": 0.234256927, "cost_per_ticket": 3.333333333, "savings": 8680.0}, {"kw": 25, "conv_hubspot": 1036.0, "conv_chatbot": 581.0, "conv_total": 1617.0, "share_chatbot": 0.3593073593, "takeovers": 227.0, "solved_bot": 354.0, "auto_bot": 0.6092943201, "auto_all": 0.2189239332, "cost_per_ticket": 3.442340792, "savings": 8530.120482}, {"kw": 26, "conv_hubspot": 1055.0, "conv_chatbot": 645.0, "conv_total": 1700.0, "share_chatbot": 0.3794117647, "takeovers": 247.0, "solved_bot": 398.0, "auto_bot": 0.6170542636, "auto_all": 0.2341176471, "cost_per_ticket": 3.100775194, "savings": 8638.75969}, {"kw": 27, "conv_hubspot": 1155.0, "conv_chatbot": 585.0, "conv_total": 1740.0, "share_chatbot": 0.3362068966, "takeovers": 251.0, "solved_bot": 334.0, "auto_bot": 0.5709401709, "auto_all": 0.191954023, "cost_per_ticket": 3.418803419, "savings": 7993.162393}], "team": [{"kw": 23, "Eli": {"messages": 740.0, "aht": 1.53}, "Jeanine": {"messages": 438.0, "aht": 2.42}, "Vivien": {"messages": 229.0, "aht": 2.11}, "Jan": {"messages": 56.0, "aht": 2.51}}, {"kw": 24, "Eli": {"messages": 800.0, "aht": 1.7}, "Jeanine": {"messages": 0.0, "aht": null}, "Vivien": {"messages": 338.0, "aht": 2.28}, "Jan": {"messages": 248.0, "aht": 2.0}}, {"kw": 25, "Eli": {"messages": 550.0, "aht": 1.93}, "Jeanine": {"messages": 429.0, "aht": 2.37}, "Vivien": {"messages": 279.0, "aht": 2.98}, "Jan": {"messages": 80.0, "aht": 3.07}}, {"kw": 26, "Eli": {"messages": 700.0, "aht": 1.57}, "Jeanine": {"messages": 531.0, "aht": 2.1}, "Vivien": {"messages": 340.0, "aht": 1.74}, "Jan": {"messages": 65.0, "aht": 1.94}}, {"kw": 27, "Eli": {"messages": 150.0, "aht": 1.82}, "Jeanine": {"messages": 1239.0, "aht": 2.16}, "Vivien": {"messages": 380.0, "aht": 2.09}, "Jan": {"messages": 277.0, "aht": 2.13}}], "refunds": [{"kw": 23, "total": 1046.0, "refund_tickets": 392.0, "positive": 36.0, "negative": 356.0, "decline_rate": 0.9081632653, "share": 0.3747609943, "net": 11477.44, "gross": 13656.16}, {"kw": 24, "total": 988.0, "refund_tickets": 450.0, "positive": 41.0, "negative": 409.0, "decline_rate": 0.9088888889, "share": 0.455465587, "net": 13186.16, "gross": 15689.24}, {"kw": 25, "total": 1036.0, "refund_tickets": 408.0, "positive": 26.0, "negative": 382.0, "decline_rate": 0.9362745098, "share": 0.3938223938, "net": 12315.68, "gross": 14653.52}, {"kw": 26, "total": 1055.0, "refund_tickets": 419.0, "positive": 35.0, "negative": 384.0, "decline_rate": 0.9164677804, "share": 0.3971563981, "net": 12380.16, "gross": 14730.24}, {"kw": 27, "total": 1155.0, "refund_tickets": 397.0, "positive": 33.0, "negative": 364.0, "decline_rate": 0.9168765743, "share": 0.3437229437, "net": 11735.36, "gross": 13963.04}], "costs": [{"month": "Januar", "total_cost": null, "tickets": 7140.0, "cpt": 3.026880112, "tickets_hs": 4767.0, "tickets_cb": 2373.0}, {"month": "Februar", "total_cost": null, "tickets": 7086.0, "cpt": 2.595004234, "tickets_hs": 4896.0, "tickets_cb": 2190.0}, {"month": "M\u00e4rz", "total_cost": null, "tickets": 9707.0, "cpt": 1.959297414, "tickets_hs": 5727.0, "tickets_cb": 3980.0}, {"month": "April", "total_cost": null, "tickets": 7679.0, "cpt": 2.082048444, "tickets_hs": 4467.0, "tickets_cb": 3212.0}, {"month": "Mai", "total_cost": null, "tickets": 6566.0, "cpt": 2.392945477, "tickets_hs": 3989.0, "tickets_cb": 2577.0}, {"month": "Juni", "total_cost": null, "tickets": 7049.0, "cpt": 2.147046862, "tickets_hs": 4398.0, "tickets_cb": 2651.0}], "keymetrics": {"cur": {"month": "Juni", "tickets_hs": 4398.0, "tickets_cb": 2651.0, "tickets_total": 7049.0, "mtfr": 14.925, "csat": 0.4375, "auto_all": 0.23080666275, "savings_rdr": 49359.44, "cpt": 2.147046862, "aht": 1.9800103039670276}, "prev": {"month": "Mai", "tickets_hs": 3989.0, "tickets_cb": 2577.0, "tickets_total": 6566.0, "mtfr": null, "csat": null, "auto_all": null, "savings_rdr": null, "cpt": 2.392945477, "aht": null}, "prev_month": "Mai"}};
-const META = {"source": "NeoTaste_CS_Main_KPI_Sheet.xlsx", "updated": "15.07.2026", "public": true};
+const META = {"source": "NeoTaste_CS_Main_KPI_Sheet.xlsx", "updated": "17.07.2026", "public": true};
 
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const fmtN = v => v==null?'–':Math.round(v).toLocaleString('de-DE');
@@ -576,15 +605,65 @@ function computeKeymetrics(D){
   return {cur:km(sel),prev:km(sel-1),prev_month:sel>1?MONTHS_DE[sel-1]:null};
 }
 
+/* ---------- Zeitraum-Aggregation (Woche/Monat/Jahr) ---------- */
+function aggregate(D,period){
+  if(period==='woche'){
+    const lab=rows=>rows.map(r=>Object.assign({},r,{label:'KW '+r.kw}));
+    return Object.assign({},D,{hubspot:lab(D.hubspot),moinai:lab(D.moinai),
+      team:lab(D.team),refunds:lab(D.refunds)});
+  }
+  const y=new Date().getFullYear();
+  const key=r=>period==='jahr'?String(y):MONTHS_DE[monthOfKW(r.kw)];
+  function agg(rows,how){
+    const order=[],map={};
+    rows.forEach(r=>{const k=key(r);
+      if(!map[k]){map[k]={label:k,_rows:[]};order.push(map[k]);}
+      map[k]._rows.push(r);});
+    return order.map(b=>{
+      const o={label:b.label};
+      for(const[f,h]of Object.entries(how)){
+        const v=b._rows.map(r=>r[f]).filter(x=>x!=null);
+        o[f]=v.length?(h==='sum'?v.reduce((a,c)=>a+c):v.reduce((a,c)=>a+c)/v.length):null;
+      }
+      return o;});
+  }
+  const hs=agg(D.hubspot,{created:'sum',user:'sum',partner:'sum',
+    messages:'sum',csat:'avg',mtfr:'avg'});
+  const ma=agg(D.moinai,{conv_hubspot:'sum',conv_chatbot:'sum',conv_total:'sum',
+    takeovers:'sum',auto_bot:'avg',auto_all:'avg',savings:'sum'});
+  const rf=agg(D.refunds,{refund_tickets:'sum',positive:'sum',negative:'sum',
+    decline_rate:'avg',share:'avg',net:'sum',gross:'sum'});
+  const order=[],map={};
+  D.team.forEach(r=>{const k=key(r);
+    if(!map[k]){map[k]={label:k,rows:[]};order.push(map[k]);}
+    map[k].rows.push(r);});
+  const tm=order.map(b=>{
+    const o={label:b.label};
+    ['Eli','Jeanine','Vivien','Jan'].forEach(a=>{
+      const ms=b.rows.map(r=>r[a].messages).filter(v=>v!=null);
+      const ah=b.rows.map(r=>r[a].aht).filter(v=>v!=null);
+      o[a]={messages:ms.length?ms.reduce((x,z)=>x+z):null,
+            aht:ah.length?ah.reduce((x,z)=>x+z)/ah.length:null};});
+    return o;});
+  return Object.assign({},D,{hubspot:hs,moinai:ma,team:tm,refunds:rf});
+}
+
 /* ---------- Build ---------- */
+let lastData=null;
 function renderAll(D){
 ['kmtiles','tiles','sec-hubspot','sec-moinai','sec-team','sec-refunds','sec-costs']
   .forEach(id=>document.getElementById(id).replaceChildren());
-const hs=D.hubspot, ma=D.moinai, tm=D.team, rf=D.refunds, co=D.costs;
-const kwl=hs.map(r=>'KW '+r.kw);
-const cur=hs[hs.length-1], prev=hs[hs.length-2]||{};
-const maC=ma[ma.length-1], maP=ma[ma.length-2]||{};
-const rfC=rf[rf.length-1], rfP=rf[rf.length-2]||{};
+lastData=D;
+const period=document.getElementById('periodSel').value;
+const A=aggregate(D,period);
+const hs=A.hubspot, ma=A.moinai, tm=A.team, rf=A.refunds, co=D.costs;
+const kwl=hs.map(r=>r.label);
+// Kacheln "Aktuelle Woche" + Deltas immer auf Wochenbasis (Rohdaten)
+const curW=D.hubspot[D.hubspot.length-1];
+const cur=Object.assign({},curW,{label:'KW '+curW.kw});
+const prev=D.hubspot[D.hubspot.length-2]||{};
+const maC=D.moinai[D.moinai.length-1], maP=D.moinai[D.moinai.length-2]||{};
+const rfC=D.refunds[D.refunds.length-1], rfP=D.refunds[D.refunds.length-2]||{};
 const coC=co[co.length-1]||{};
 
 const standTxt=D.live
@@ -593,7 +672,7 @@ const standTxt=D.live
 document.getElementById('subline').textContent=
   `Aktuelle Woche: KW ${cur.kw} · ${standTxt}`;
 document.getElementById('footline').textContent=
-  `Quelle: NeoTaste CS KPI-Liste (Google Sheets) · ${standTxt} · Zeitraum: KW ${hs[0].kw}–${cur.kw}`;
+  `Quelle: NeoTaste CS KPI-Liste (Google Sheets) · ${standTxt} · Zeitraum: KW ${D.hubspot[0].kw}–${cur.kw}`;
 
 /* Key Metrics (Monatssicht) */
 const KM=computeKeymetrics(D);
@@ -642,43 +721,43 @@ tiles.append(
   tile('Cost per Ticket ('+(coC.month||'–')+')',fmtEuro2(coC.cpt),null,null)
 );
 
-const C={s1:css('--s1'),s2:css('--s2'),s3:css('--s3'),s4:css('--s4'),s5:css('--s5'),s6:css('--s6')};
+const C={s1:css('--s1'),s2:css('--s2'),s3:css('--s3'),s4:css('--s4'),s5:css('--s5'),s6:css('--s6'),s7:css('--s7'),s8:css('--s8')};
 
 /* HubSpot */
 chartCard(document.getElementById('sec-hubspot'),{
-  title:'Ticketvolumen pro Woche',hint:'User- und Partner-Tickets, gestapelt',
+  title:'Ticketvolumen',hint:'User- und Partner-Tickets, gestapelt',
   legend:[{name:'User',color:C.s1},{name:'Partner',color:C.s2}],
-  table:{cols:['KW','User','Partner','Gesamt'],
-    rows:hs.map(r=>['KW '+r.kw,fmtN(r.user),fmtN(r.partner),fmtN(r.created)])},
+  table:{cols:['Zeitraum','User','Partner','Gesamt'],
+    rows:hs.map(r=>[r.label,fmtN(r.user),fmtN(r.partner),fmtN(r.created)])},
   spec:{defaultView:'balken',labels:kwl,yFmt:fmtN,totalLabelLast:true,
     series:[{name:'User',color:C.s1,values:hs.map(r=>r.user)},
             {name:'Partner',color:C.s2,values:hs.map(r=>r.partner)}]}
 });
 chartCard(document.getElementById('sec-hubspot'),{
-  title:'CSAT pro Woche',hint:'Anteil zufriedener Bewertungen',
-  table:{cols:['KW','CSAT'],rows:hs.map(r=>['KW '+r.kw,fmtP(r.csat)])},
+  title:'CSAT',hint:'Anteil zufriedener Bewertungen',
+  table:{cols:['Zeitraum','CSAT'],rows:hs.map(r=>[r.label,fmtP(r.csat)])},
   spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',labelLast:true,
-    series:[{name:'CSAT',color:C.s1,values:hs.map(r=>r.csat),fmt:fmtP}]}
+    series:[{name:'CSAT',color:C.s2,values:hs.map(r=>r.csat),fmt:fmtP}]}
 });
 chartCard(document.getElementById('sec-hubspot'),{
   title:'Median First Reply Time',hint:'Stunden bis zur ersten Antwort (Median)',
-  table:{cols:['KW','MTFR (h)'],rows:hs.map(r=>['KW '+r.kw,fmtH(r.mtfr)])},
+  table:{cols:['Zeitraum','MTFR (h)'],rows:hs.map(r=>[r.label,fmtH(r.mtfr)])},
   spec:{defaultView:'linie',labels:kwl,yFmt:v=>v+' h',labelLast:true,
     series:[{name:'MTFR',color:C.s1,values:hs.map(r=>r.mtfr),fmt:fmtH}]}
 });
 chartCard(document.getElementById('sec-hubspot'),{
-  title:'Messages pro Woche',hint:'Vom Team gesendete Nachrichten',
-  table:{cols:['KW','Messages'],rows:hs.map(r=>['KW '+r.kw,fmtN(r.messages)])},
+  title:'Messages',hint:'Vom Team gesendete Nachrichten',
+  table:{cols:['Zeitraum','Messages'],rows:hs.map(r=>[r.label,fmtN(r.messages)])},
   spec:{defaultView:'linie',labels:kwl,yFmt:fmtN,labelLast:true,
-    series:[{name:'Messages',color:C.s1,values:hs.map(r=>r.messages),fmt:fmtN}]}
+    series:[{name:'Messages',color:C.s5,values:hs.map(r=>r.messages),fmt:fmtN}]}
 });
 
 /* MoinAI */
 chartCard(document.getElementById('sec-moinai'),{
-  title:'Conversations pro Woche',hint:'Aufgeteilt nach Kanal',
+  title:'Conversations',hint:'Aufgeteilt nach Kanal',
   legend:[{name:'HubSpot',color:C.s1},{name:'Chatbot',color:C.s2}],
-  table:{cols:['KW','HubSpot','Chatbot','Gesamt'],
-    rows:ma.map(r=>['KW '+r.kw,fmtN(r.conv_hubspot),fmtN(r.conv_chatbot),fmtN(r.conv_total)])},
+  table:{cols:['Zeitraum','HubSpot','Chatbot','Gesamt'],
+    rows:ma.map(r=>[r.label,fmtN(r.conv_hubspot),fmtN(r.conv_chatbot),fmtN(r.conv_total)])},
   spec:{defaultView:'balken',labels:kwl,yFmt:fmtN,totalLabelLast:true,
     series:[{name:'HubSpot',color:C.s1,values:ma.map(r=>r.conv_hubspot)},
             {name:'Chatbot',color:C.s2,values:ma.map(r=>r.conv_chatbot)}]}
@@ -687,78 +766,78 @@ chartCard(document.getElementById('sec-moinai'),{
   title:'Automation Rate',hint:'Anteil automatisch gelöster Anfragen',
   legend:[{name:'Chatbot-Konversationen',color:C.s1,type:'line'},
           {name:'Alle Tickets',color:C.s2,type:'line'}],
-  table:{cols:['KW','Chatbot','Alle Tickets'],
-    rows:ma.map(r=>['KW '+r.kw,fmtP(r.auto_bot),fmtP(r.auto_all)])},
+  table:{cols:['Zeitraum','Chatbot','Alle Tickets'],
+    rows:ma.map(r=>[r.label,fmtP(r.auto_bot),fmtP(r.auto_all)])},
   spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',labelSeries:1,
     series:[{name:'Chatbot',color:C.s1,values:ma.map(r=>r.auto_bot),fmt:fmtP},
             {name:'Alle Tickets',color:C.s2,values:ma.map(r=>r.auto_all),fmt:fmtP}]}
 });
 chartCard(document.getElementById('sec-moinai'),{
-  title:'Weekly Savings',hint:'Ersparnis durch Chatbot-Automatisierung',
-  table:{cols:['KW','Savings'],rows:ma.map(r=>['KW '+r.kw,fmtEuro(r.savings)])},
+  title:'Savings',hint:'Ersparnis durch Chatbot-Automatisierung',
+  table:{cols:['Zeitraum','Savings'],rows:ma.map(r=>[r.label,fmtEuro(r.savings)])},
   spec:{defaultView:'balken',labels:kwl,yFmt:v=>fmtN(v),totalLabelLast:true,
     series:[{name:'Savings',color:C.s2,values:ma.map(r=>r.savings),fmt:fmtEuro}]}
 });
 chartCard(document.getElementById('sec-moinai'),{
-  title:'Takeovers pro Woche',hint:'Konversationen mit Übernahme durch das Team',
-  table:{cols:['KW','Takeovers'],rows:ma.map(r=>['KW '+r.kw,fmtN(r.takeovers)])},
+  title:'Takeovers',hint:'Konversationen mit Übernahme durch das Team',
+  table:{cols:['Zeitraum','Takeovers'],rows:ma.map(r=>[r.label,fmtN(r.takeovers)])},
   spec:{defaultView:'linie',labels:kwl,yFmt:fmtN,labelLast:true,
-    series:[{name:'Takeovers',color:C.s1,values:ma.map(r=>r.takeovers),fmt:fmtN}]}
+    series:[{name:'Takeovers',color:C.s2,values:ma.map(r=>r.takeovers),fmt:fmtN}]}
 });
 
 /* Team */
 const agents=['Eli','Jeanine','Vivien','Jan'];
 const agentColors=[C.s1,C.s2,C.s3,C.s5];
 chartCard(document.getElementById('sec-team'),{
-  title:'Messages pro Agent',hint:'Gesendete Nachrichten pro Woche',
+  title:'Messages pro Agent',hint:'Gesendete Nachrichten',
   legend:agents.map((a,i)=>({name:a,color:agentColors[i],type:'line'})),
-  table:{cols:['KW',...agents],
-    rows:tm.map(r=>['KW '+r.kw,...agents.map(a=>fmtN(r[a].messages))])},
-  spec:{defaultView:'linie',labels:tm.map(r=>'KW '+r.kw),yFmt:fmtN,
+  table:{cols:['Zeitraum',...agents],
+    rows:tm.map(r=>[r.label,...agents.map(a=>fmtN(r[a].messages))])},
+  spec:{defaultView:'linie',labels:tm.map(r=>r.label),yFmt:fmtN,
     series:agents.map((a,i)=>({name:a,color:agentColors[i],
       values:tm.map(r=>r[a].messages),fmt:fmtN}))}
 });
 chartCard(document.getElementById('sec-team'),{
   title:'Ø Handling Time pro Agent',hint:'Minuten pro Vorgang',
   legend:agents.map((a,i)=>({name:a,color:agentColors[i],type:'line'})),
-  table:{cols:['KW',...agents],
-    rows:tm.map(r=>['KW '+r.kw,...agents.map(a=>fmtMin(r[a].aht))])},
-  spec:{defaultView:'linie',labels:tm.map(r=>'KW '+r.kw),yFmt:v=>v+' min',
+  table:{cols:['Zeitraum',...agents],
+    rows:tm.map(r=>[r.label,...agents.map(a=>fmtMin(r[a].aht))])},
+  spec:{defaultView:'linie',labels:tm.map(r=>r.label),yFmt:v=>v+' min',
     series:agents.map((a,i)=>({name:a,color:agentColors[i],
       values:tm.map(r=>r[a].aht),fmt:fmtMin}))}
 });
 
 /* Refunds */
 chartCard(document.getElementById('sec-refunds'),{
-  title:'Refund-Tickets pro Woche',hint:'Positive vs. abgelehnte Refund-Anfragen',
-  legend:[{name:'Abgelehnt',color:C.s1},{name:'Erstattet',color:C.s2}],
-  table:{cols:['KW','Abgelehnt','Erstattet','Gesamt','Decline Rate'],
-    rows:rf.map(r=>['KW '+r.kw,fmtN(r.negative),fmtN(r.positive),
+  title:'Refund-Tickets',hint:'Positive vs. abgelehnte Refund-Anfragen',
+  legend:[{name:'Abgelehnt',color:C.s8},{name:'Erstattet',color:C.s2}],
+  table:{cols:['Zeitraum','Abgelehnt','Erstattet','Gesamt','Decline Rate'],
+    rows:rf.map(r=>[r.label,fmtN(r.negative),fmtN(r.positive),
       fmtN(r.refund_tickets),fmtP(r.decline_rate)])},
   spec:{defaultView:'balken',labels:kwl,yFmt:fmtN,totalLabelLast:true,
-    series:[{name:'Abgelehnt',color:C.s1,values:rf.map(r=>r.negative)},
+    series:[{name:'Abgelehnt',color:C.s8,values:rf.map(r=>r.negative)},
             {name:'Erstattet',color:C.s2,values:rf.map(r=>r.positive)}]}
 });
 chartCard(document.getElementById('sec-refunds'),{
   title:'Refund Decline Rate',hint:'Anteil abgelehnter Refund-Anfragen',
-  table:{cols:['KW','Decline Rate'],rows:rf.map(r=>['KW '+r.kw,fmtP(r.decline_rate)])},
+  table:{cols:['Zeitraum','Decline Rate'],rows:rf.map(r=>[r.label,fmtP(r.decline_rate)])},
   spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',labelLast:true,
-    series:[{name:'Decline Rate',color:C.s1,values:rf.map(r=>r.decline_rate),fmt:fmtP}]}
+    series:[{name:'Decline Rate',color:C.s8,values:rf.map(r=>r.decline_rate),fmt:fmtP}]}
 });
 chartCard(document.getElementById('sec-refunds'),{
   title:'Money Contribution',hint:'Durch abgelehnte Refunds gesichertes Geld',
-  legend:[{name:'Netto',color:C.s1,type:'line'},{name:'Brutto',color:C.s2,type:'line'}],
-  table:{cols:['KW','Netto','Brutto'],
-    rows:rf.map(r=>['KW '+r.kw,fmtEuro(r.net),fmtEuro(r.gross)])},
+  legend:[{name:'Netto',color:C.s8,type:'line'},{name:'Brutto',color:C.s3,type:'line'}],
+  table:{cols:['Zeitraum','Netto','Brutto'],
+    rows:rf.map(r=>[r.label,fmtEuro(r.net),fmtEuro(r.gross)])},
   spec:{defaultView:'linie',labels:kwl,yFmt:fmtN,
-    series:[{name:'Netto',color:C.s1,values:rf.map(r=>r.net),fmt:fmtEuro},
-            {name:'Brutto',color:C.s2,values:rf.map(r=>r.gross),fmt:fmtEuro}]}
+    series:[{name:'Netto',color:C.s8,values:rf.map(r=>r.net),fmt:fmtEuro},
+            {name:'Brutto',color:C.s3,values:rf.map(r=>r.gross),fmt:fmtEuro}]}
 });
 chartCard(document.getElementById('sec-refunds'),{
   title:'Share of Refund Tickets',hint:'Anteil der Refund-Tickets am Gesamtvolumen',
-  table:{cols:['KW','Anteil'],rows:rf.map(r=>['KW '+r.kw,fmtP(r.share)])},
+  table:{cols:['Zeitraum','Anteil'],rows:rf.map(r=>[r.label,fmtP(r.share)])},
   spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',labelLast:true,
-    series:[{name:'Anteil',color:C.s1,values:rf.map(r=>r.share),fmt:fmtP}]}
+    series:[{name:'Anteil',color:C.s8,values:rf.map(r=>r.share),fmt:fmtP}]}
 });
 
 /* Costs */
@@ -772,20 +851,29 @@ chartCard(document.getElementById('sec-costs'),{
     :{cols:['Monat','Kosten gesamt','Tickets','CPT'],
       rows:co.map(r=>[r.month,fmtEuro(r.total_cost),fmtN(r.tickets),fmtEuro2(r.cpt)])},
   spec:{defaultView:'linie',labels:coL,yFmt:v=>v+' €',labelLast:true,
-    series:[{name:'CPT',color:C.s1,values:co.map(r=>r.cpt),fmt:fmtEuro2}]}
+    series:[{name:'CPT',color:C.s3,values:co.map(r=>r.cpt),fmt:fmtEuro2}]}
 });
 if(!META.public){
 chartCard(document.getElementById('sec-costs'),{
   title:'CST-Gesamtkosten (monatlich)',hint:'Team + MoinAI Flat Fee, brutto',
   table:{cols:['Monat','Gesamtkosten'],rows:co.map(r=>[r.month,fmtEuro(r.total_cost)])},
   spec:{defaultView:'balken',labels:coL,yFmt:fmtN,totalLabelLast:true,
-    series:[{name:'Gesamtkosten',color:C.s1,values:co.map(r=>r.total_cost),fmt:fmtEuro}]}
+    series:[{name:'Gesamtkosten',color:C.s3,values:co.map(r=>r.total_cost),fmt:fmtEuro}]}
 });
 }
 } /* Ende renderAll */
 
 /* ---------- Start & Live-Refresh ---------- */
 const wrap=document.querySelector('.wrap');
+// Zeitraum aus URL wiederherstellen + Umschalten verdrahten
+const periodSel=document.getElementById('periodSel');
+const urlPeriod=new URLSearchParams(location.search).get('zeitraum');
+if(['woche','monat','jahr'].includes(urlPeriod))periodSel.value=urlPeriod;
+periodSel.addEventListener('change',()=>{
+  const u=new URL(location);u.searchParams.set('zeitraum',periodSel.value);
+  history.replaceState(null,'',u);
+  if(lastData)renderAll(lastData);
+});
 renderAll(DATA); // eingebettete Daten sofort zeigen — nie eine leere Seite
 
 async function refreshLive(){
