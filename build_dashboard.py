@@ -272,7 +272,15 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     margin-right:7px;vertical-align:2px;}
   .insights{background:var(--surface-1);border:1px solid var(--border);
     border-radius:10px;padding:14px 18px;margin-top:18px;}
-  .insights h2{font-size:13.5px;font-weight:650;margin:0 0 8px;}
+  .insights h2{font-size:13.5px;font-weight:650;margin:0;display:flex;
+    align-items:center;gap:8px;cursor:pointer;user-select:none;}
+  .insights h2 .chev{margin-left:auto;color:var(--ink-3);font-size:11px;
+    transition:transform .15s;}
+  .insights.open h2 .chev{transform:rotate(180deg);}
+  .insights .body{display:none;margin-top:8px;}
+  .insights.open .body{display:block;}
+  .insights .count{background:var(--st-warn);color:#fff;border-radius:9px;
+    font-size:11px;font-weight:650;padding:1px 8px;}
   .insights .row{display:flex;gap:9px;align-items:baseline;
     font-size:13px;margin:5px 0;color:var(--ink-2);}
   .insights .dot{flex:none;width:9px;height:9px;border-radius:50%;
@@ -994,14 +1002,27 @@ document.getElementById('footline').textContent=
   if(!top.length){box.style.display='none';}
   else{
     box.style.display='';
-    const h=document.createElement('h2');h.textContent='🔎 Aufmerksamkeit — KW '+lastOf(RW).kw;box.append(h);
+    box.classList.toggle('open',window.__insightsOpen===true);
+    const h=document.createElement('h2');
+    const title=document.createElement('span');
+    title.textContent='🔎 Aufmerksamkeit — KW '+lastOf(RW).kw;
+    const cnt=document.createElement('span');cnt.className='count';
+    cnt.textContent=top.length+(top.length===1?' Hinweis':' Hinweise');
+    const chev=document.createElement('span');chev.className='chev';chev.textContent='▼';
+    h.append(title,cnt,chev);
+    h.addEventListener('click',()=>{
+      window.__insightsOpen=!box.classList.contains('open');
+      box.classList.toggle('open');
+    });
+    const body=document.createElement('div');body.className='body';
     top.forEach(it=>{
       const row=document.createElement('div');row.className='row';
       const dot=document.createElement('span');dot.className='dot';
       dot.style.background=css(ST_COL[it.st]||'--st-warn');
       const t=document.createElement('span');t.textContent=it.txt;
-      row.append(dot,t);box.append(row);
+      row.append(dot,t);body.append(row);
     });
+    box.append(h,body);
   }
 })();
 
