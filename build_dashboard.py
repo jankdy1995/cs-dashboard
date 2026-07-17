@@ -56,13 +56,16 @@ def extract(path):
     } for r in ma]
 
     tp = rows('👥 Team_Performance', maxcol=22)
-    agents = {'Eli': (0, 1, 2), 'Jeanine': (6, 7, 8),
-              'Vivien': (12, 13, 14), 'Jan': (17, 18, 19)}
+    agents = {'Eli': (0, 1, 2, 3, 5), 'Jeanine': (6, 7, 8, 9, 11),
+              'Vivien': (12, 13, 14, 15, 16), 'Jan': (17, 18, 19, 20, 21)}
     d['team'] = []
     for r in tp:
         row = {'kw': int(r[0])}
-        for name, (kwc, msgc, ahtc) in agents.items():
-            row[name] = {'messages': num(r[msgc]), 'aht': num(r[ahtc])}
+        for name, (kwc, msgc, ahtc, actc, notec) in agents.items():
+            note = r[notec] if notec < len(r) else None
+            note = str(note).strip() if note not in (None, '/', '') else None
+            row[name] = {'messages': num(r[msgc]), 'aht': num(r[ahtc]),
+                         'active_hours': num(r[actc]), 'note': note}
         d['team'].append(row)
 
     rf = rows('💸 Refund_Tracking', maxcol=9)
@@ -85,6 +88,7 @@ def extract(path):
         return None
 
     col_total = find_col(hdr2, 'cst gesamt')
+    col_fee = find_col(hdr2, 'moinai')
     col_hs = find_col(hdr3, 'created tickets hubspot')
     col_cb = find_col(hdr3, 'created tickets cb')
     # bevorzugt die Gesamtspalte "Created Tickets" (exakt), sonst HubSpot-Spalte
@@ -113,6 +117,7 @@ def extract(path):
             'cpt': cpt,
             'tickets_hs': num(r[col_hs]) if col_hs is not None else None,
             'tickets_cb': num(r[col_cb]) if col_cb is not None else None,
+            'moinai_fee': num(r[col_fee]) if col_fee is not None else None,
         })
 
     d['keymetrics'] = build_keymetrics(d)
@@ -206,6 +211,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     --s1:#2a78d6; --s2:#1baf7a; --s3:#eda100; --s4:#008300;
     --s5:#4a3aa7; --s6:#e34948; --s7:#e87ba4; --s8:#eb6834;
     --good:#006300; --bad:#d03b3b;
+    --st-good:#0ca30c; --st-warn:#eda100; --st-crit:#d03b3b;
   }
   @media (prefers-color-scheme: dark){
     :root{
@@ -258,6 +264,19 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   .tile .delta{font-size:12px;margin-top:3px;color:var(--ink-3);}
   .tile .delta.up{color:var(--good)} .tile .delta.down{color:var(--bad)}
   .tile .sub{color:var(--ink-3);font-size:12px;margin-top:2px;}
+  .tile .goal{color:var(--ink-3);font-size:11px;margin-top:4px;}
+  .tile.st-good{border-left:3px solid var(--st-good);}
+  .tile.st-warn{border-left:3px solid var(--st-warn);}
+  .tile.st-crit{border-left:3px solid var(--st-crit);}
+  .tile .stdot{display:inline-block;width:9px;height:9px;border-radius:50%;
+    margin-right:7px;vertical-align:2px;}
+  .insights{background:var(--surface-1);border:1px solid var(--border);
+    border-radius:10px;padding:14px 18px;margin-top:18px;}
+  .insights h2{font-size:13.5px;font-weight:650;margin:0 0 8px;}
+  .insights .row{display:flex;gap:9px;align-items:baseline;
+    font-size:13px;margin:5px 0;color:var(--ink-2);}
+  .insights .dot{flex:none;width:9px;height:9px;border-radius:50%;
+    position:relative;top:1px;}
   .tile .split{color:var(--ink-2);font-size:12px;margin-top:4px;}
   .km .tile .value{font-size:30px;}
   .km .tile{padding:16px 18px;}
@@ -320,6 +339,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     </div>
   </header>
 
+  <div class="insights" id="insights" style="display:none"></div>
+
   <div class="section-title" style="--acc:var(--s3)">⭐ Key Metrics — <span id="km-title"></span><span class="rule"></span></div>
   <div class="tiles km" id="kmtiles"></div>
 
@@ -356,11 +377,32 @@ const fmtEuro2 = v => v==null?'–':v.toLocaleString('de-DE',{minimumFractionDig
 const fmtH = v => v==null?'–':v.toLocaleString('de-DE',{maximumFractionDigits:1})+' h';
 const fmtMin = v => v==null?'–':v.toLocaleString('de-DE',{maximumFractionDigits:2})+' min';
 
+/* ---------- Zielwerte & Ampel-Logik ---------- */
+const TARGETS={
+  csat:{dir:'up',good:0.60,warn:0.45,goal:'Ziel ≥ 60 %',line:0.60},
+  mtfr:{dir:'down',good:12,warn:18,goal:'Ziel ≤ 12 h',line:12},
+  auto_all:{dir:'up',good:0.25,warn:0.18,goal:'Ziel ≥ 25 %',line:0.25},
+  decline_rate:{dir:'up',good:0.90,warn:0.85,goal:'Ziel ≥ 90 %',line:0.90},
+  cpt:{dir:'down',good:2.5,warn:3.5,goal:'Ziel ≤ 2,50 €',line:2.5},
+  aht:{dir:'down',good:2.5,warn:3.5,goal:'Ziel ≤ 2,5 min',line:2.5},
+};
+function statusOf(key,v){
+  const t=TARGETS[key];
+  if(!t||v==null)return null;
+  if(t.dir==='up')return v>=t.good?'good':(v>=t.warn?'warn':'crit');
+  return v<=t.good?'good':(v<=t.warn?'warn':'crit');
+}
+const ST_COL={good:'--st-good',warn:'--st-warn',crit:'--st-crit'};
+
 /* ---------- Tiles ---------- */
-function tile(label, value, delta, goodWhen){ // goodWhen: 'up'|'down'|null
-  const el = document.createElement('div'); el.className='tile';
+function tile(label, value, delta, goodWhen, statusKey, statusVal){
+  const st=statusKey?statusOf(statusKey,statusVal):null;
+  const el = document.createElement('div'); el.className='tile'+(st?' st-'+st:'');
   const l = document.createElement('div'); l.className='label'; l.textContent=label;
-  const v = document.createElement('div'); v.className='value'; v.textContent=value;
+  const v = document.createElement('div'); v.className='value';
+  if(st){const dot=document.createElement('span');dot.className='stdot';
+    dot.style.background=css(ST_COL[st]);v.append(dot);}
+  v.append(document.createTextNode(value));
   el.append(l,v);
   if(delta!=null && isFinite(delta)){
     const d = document.createElement('div');
@@ -372,17 +414,23 @@ function tile(label, value, delta, goodWhen){ // goodWhen: 'up'|'down'|null
     d.textContent=(delta>=0?'▲ +':'▼ −')+pct+' % vs. Vorwoche';
     el.append(d);
   }
+  if(statusKey&&TARGETS[statusKey]){const g=document.createElement('div');
+    g.className='goal';g.textContent=TARGETS[statusKey].goal;el.append(g);}
   return el;
 }
 function rel(cur,prev){ return (cur!=null&&prev!=null&&prev!==0)?(cur-prev)/prev:null; }
 
-function kmTile({label,value,delta,goodWhen,deltaLabel,sub,split}){
-  const el=document.createElement('div');el.className='tile';
+function kmTile({label,value,delta,goodWhen,deltaLabel,sub,split,statusKey,statusVal}){
+  const st=statusKey?statusOf(statusKey,statusVal):null;
+  const el=document.createElement('div');el.className='tile'+(st?' st-'+st:'');
   const l=document.createElement('div');l.className='label';l.textContent=label;
   el.append(l);
   if(split){const sp=document.createElement('div');sp.className='split';
     sp.textContent=split;el.append(sp);}
-  const v=document.createElement('div');v.className='value';v.textContent=value;
+  const v=document.createElement('div');v.className='value';
+  if(st){const dot=document.createElement('span');dot.className='stdot';
+    dot.style.background=css(ST_COL[st]);v.append(dot);}
+  v.append(document.createTextNode(value));
   el.append(v);
   const d=document.createElement('div');
   if(delta!=null&&isFinite(delta)){
@@ -395,6 +443,8 @@ function kmTile({label,value,delta,goodWhen,deltaLabel,sub,split}){
   }
   el.append(d);
   if(sub){const s=document.createElement('div');s.className='sub';s.textContent=sub;el.append(s);}
+  if(statusKey&&TARGETS[statusKey]){const g=document.createElement('div');
+    g.className='goal';g.textContent=TARGETS[statusKey].goal;el.append(g);}
   return el;
 }
 
@@ -514,10 +564,28 @@ function tooltipFor(chartEl){
 }
 
 /* Line chart: series=[{name,color,values,fmt}], area: Flächen-Variante */
-function lineChart(el,{labels,series,yFmt,labelSeries,area}){
+function lineChart(el,{labels,series,yFmt,labelSeries,area,target,trend}){
   const svg=makeSvg();el.append(svg);
-  const max=Math.max(...series.flatMap(s=>s.values.filter(v=>v!=null)));
+  let max=Math.max(...series.flatMap(s=>s.values.filter(v=>v!=null)));
+  if(target!=null)max=Math.max(max,target*1.08);
   const y=frame(svg,max,yFmt);
+  if(target!=null){ // gestrichelte Ziellinie
+    const tl=line(svg,M.l,y(target),W-M.r,y(target),css('--ink-3'),1);
+    tl.setAttribute('stroke-dasharray','5 4');tl.setAttribute('opacity','.65');
+    text(svg,W-M.r,y(target)-4,'Ziel','end',9.5);
+  }
+  if(trend&&series.length===1&&labels.length>=4){ // 4-Perioden-Trend
+    const vals=series[0].values;
+    const tv=vals.map((_,i)=>{
+      const w=vals.slice(Math.max(0,i-3),i+1).filter(v=>v!=null);
+      return w.length?w.reduce((a,b)=>a+b)/w.length:null;});
+    const x0=i=>M.l+(labels.length===1?0.5:(i/(labels.length-1)))*(W-M.l-M.r);
+    const d=tv.map((v,i)=>v==null?'':((i===0||tv[i-1]==null)?'M':'L')+x0(i)+' '+y(v)).join(' ');
+    const tp=document.createElementNS(svg.namespaceURI,'path');
+    tp.setAttribute('d',d);tp.setAttribute('fill','none');
+    tp.setAttribute('stroke',css('--baseline'));tp.setAttribute('stroke-width',2);
+    tp.setAttribute('opacity','.8');svg.append(tp);
+  }
   const x=i=>M.l+(labels.length===1?0.5:(i/(labels.length-1)))*(W-M.l-M.r);
   labels.forEach((lb,i)=>text(svg,x(i),H-M.b+15,lb,'middle'));
   const cross=line(svg,0,M.t,0,H-M.b,css('--baseline'),1);cross.setAttribute('opacity','0');
@@ -629,10 +697,17 @@ function pieChart(el,{labels,series,yFmt}){
 }
 
 /* Bar chart, optionally stacked: series=[{name,color,values,fmt}] */
-function barChart(el,{labels,series,yFmt,totalLabelLast}){
+function barChart(el,{labels,series,yFmt,totalLabelLast,target}){
   const svg=makeSvg();el.append(svg);
   const totals=labels.map((_,i)=>series.reduce((a,s)=>a+(s.values[i]||0),0));
-  const y=frame(svg,Math.max(...totals),yFmt);
+  let bmax=Math.max(...totals);
+  if(target!=null)bmax=Math.max(bmax,target*1.08);
+  const y=frame(svg,bmax,yFmt);
+  if(target!=null){
+    const tl=line(svg,M.l,y(target),W-M.r,y(target),css('--ink-3'),1);
+    tl.setAttribute('stroke-dasharray','5 4');tl.setAttribute('opacity','.65');
+    text(svg,W-M.r,y(target)-4,'Ziel','end',9.5);
+  }
   const band=(W-M.l-M.r)/labels.length, bw=Math.min(24,band*0.5);
   const surf=css('--surface-1');
   const tt=tooltipFor(el);
@@ -729,10 +804,14 @@ function buildLiveData(hsT,maT,tmT,rfT){
   const ma=dataRows(parseCSV(maT)).map(r=>({kw:Math.round(n(r[0])),conv_hubspot:n(r[1]),
     conv_chatbot:n(r[2]),conv_total:n(r[3]),share_chatbot:n(r[4]),takeovers:n(r[5]),
     solved_bot:n(r[6]),auto_bot:n(r[7]),auto_all:n(r[8]),savings:n(r[10])}));
-  const AG={Eli:[0,1,2],Jeanine:[6,7,8],Vivien:[12,13,14],Jan:[17,18,19]};
+  const AG={Eli:[0,1,2,3,5],Jeanine:[6,7,8,9,11],Vivien:[12,13,14,15,16],Jan:[17,18,19,20,21]};
   const tm=dataRows(parseCSV(tmT)).map(r=>{
     const o={kw:Math.round(n(r[0]))};
-    for(const[a,[,mc,ac]]of Object.entries(AG))o[a]={messages:n(r[mc]),aht:n(r[ac])};
+    for(const[a,[,mc,ac,hc,nc]]of Object.entries(AG)){
+      let note=(r[nc]||'').trim();
+      if(note==='/'||note==='')note=null;
+      o[a]={messages:n(r[mc]),aht:n(r[ac]),active_hours:n(r[hc]),note:note};
+    }
     return o;});
   const rf=dataRows(parseCSV(rfT)).map(r=>({kw:Math.round(n(r[0])),total:n(r[1]),
     refund_tickets:n(r[2]),positive:n(r[3]),negative:n(r[4]),decline_rate:n(r[5]),
@@ -826,8 +905,12 @@ function aggregate(D,period){
     ['Eli','Jeanine','Vivien','Jan'].forEach(a=>{
       const ms=b.rows.map(r=>r[a].messages).filter(v=>v!=null);
       const ah=b.rows.map(r=>r[a].aht).filter(v=>v!=null);
+      const hh=b.rows.map(r=>r[a].active_hours).filter(v=>v!=null);
+      const nt=b.rows.map(r=>r[a].note).filter(Boolean);
       o[a]={messages:ms.length?ms.reduce((x,z)=>x+z):null,
-            aht:ah.length?ah.reduce((x,z)=>x+z)/ah.length:null};});
+            aht:ah.length?ah.reduce((x,z)=>x+z)/ah.length:null,
+            active_hours:hh.length?hh.reduce((x,z)=>x+z):null,
+            note:nt.length?nt.join(', '):null};});
     return o;});
   return Object.assign({},D,{hubspot:hs,moinai:ma,team:tm,refunds:rf});
 }
@@ -858,6 +941,70 @@ document.getElementById('subline').textContent=
 document.getElementById('footline').textContent=
   `Quelle: NeoTaste CS KPI-Liste (Google Sheets) · ${standTxt} · Zeitraum: KW ${D.hubspot[0].kw}–${cur.kw}`;
 
+/* Aufmerksamkeit: automatische Abweichungs-Hinweise */
+(function(){
+  const box=document.getElementById('insights');
+  const items=[];
+  const RW=D.hubspot,RM=D.moinai,RR=D.refunds;
+  const lastOf=a=>a[a.length-1],prevOf=a=>a[a.length-2];
+  function streak(rows,f,key){
+    let n=0;
+    for(let i=rows.length-1;i>=0;i--){
+      const st=statusOf(key,rows[i][f]);
+      if(st==='warn'||st==='crit')n++;else break;
+    }
+    return n;
+  }
+  const streaks=[
+    [RW,'csat','csat','CSAT',v=>fmtP(v)],
+    [RW,'mtfr','mtfr','Median First Reply Time',v=>fmtH(v)],
+    [RM,'auto_all','auto_all','Automation Rate',v=>fmtP(v)],
+    [RR,'decline_rate','decline_rate','Refund Decline Rate',v=>fmtP(v)],
+  ];
+  streaks.forEach(([rows,f,key,name,fmt])=>{
+    const n=streak(rows,f,key);
+    const cv=lastOf(rows)[f];
+    if(n>=2)items.push({sev:3,st:statusOf(key,cv),
+      txt:name+' verfehlt das Ziel seit '+n+' Wochen (aktuell '+fmt(cv)+' · '+TARGETS[key].goal.replace('Ziel ','Ziel: ')+').'});
+    else if(n===1)items.push({sev:1,st:statusOf(key,cv),
+      txt:name+' liegt diese Woche unter Ziel ('+fmt(cv)+' · '+TARGETS[key].goal.replace('Ziel ','Ziel: ')+').'});
+  });
+  const moves=[
+    [RW,'created','Erstellte Tickets','down',fmtN],
+    [RW,'mtfr','Median First Reply Time','down',fmtH],
+    [RM,'auto_all','Automation Rate','up',fmtP],
+    [RM,'savings','Weekly Savings','up',fmtEuro],
+    [RR,'net','Net Contribution','up',fmtEuro],
+  ];
+  moves.forEach(([rows,f,name,goodDir,fmt])=>{
+    const c=lastOf(rows),pv=prevOf(rows);
+    if(!c||!pv||c[f]==null||!pv[f])return;
+    const d=(c[f]-pv[f])/pv[f];
+    if(Math.abs(d)<0.10)return;
+    const good=(d>=0)===(goodDir==='up');
+    items.push({sev:2,st:good?'good':'warn',
+      txt:name+' '+(d>=0?'+':'−')+(Math.abs(d)*100).toLocaleString('de-DE',{maximumFractionDigits:0})+' % vs. Vorwoche ('+fmt(c[f])+').'});
+  });
+  const created=RW.map(r=>r.created).filter(v=>v!=null);
+  if(created.length>=3&&lastOf(RW).created===Math.max(...created))
+    items.push({sev:1,st:'warn',txt:'Erstellte Tickets erreichen mit '+fmtN(lastOf(RW).created)+' den höchsten Wochenwert seit Beginn der Aufzeichnung.'});
+  items.sort((a,b)=>b.sev-a.sev);
+  const top=items.slice(0,5);
+  box.replaceChildren();
+  if(!top.length){box.style.display='none';}
+  else{
+    box.style.display='';
+    const h=document.createElement('h2');h.textContent='🔎 Aufmerksamkeit — KW '+lastOf(RW).kw;box.append(h);
+    top.forEach(it=>{
+      const row=document.createElement('div');row.className='row';
+      const dot=document.createElement('span');dot.className='dot';
+      dot.style.background=css(ST_COL[it.st]||'--st-warn');
+      const t=document.createElement('span');t.textContent=it.txt;
+      row.append(dot,t);box.append(row);
+    });
+  }
+})();
+
 /* Key Metrics (Monatssicht) */
 const KM=computeKeymetrics(D);
 if(KM&&KM.cur){
@@ -872,37 +1019,37 @@ if(KM&&KM.cur){
            (k.tickets_cb!=null?' · '+fmtN(k.tickets_cb)+' CB':''),
      delta:rel(k.tickets_total,p.tickets_total),goodWhen:'down',
      deltaLabel:vsLbl,sub:'Tickets gesamt (HubSpot + Chatbot)'});
-  t({label:'Median Time to First Reply',value:fmtH(k.mtfr),
+  t({label:'Median First Reply Time',value:fmtH(k.mtfr),
      delta:rel(k.mtfr,p.mtfr),goodWhen:'down',deltaLabel:vsLbl,
-     sub:'Ø der Wochen-Mediane'});
+     sub:'Ø der Wochen-Mediane',statusKey:'mtfr',statusVal:k.mtfr});
   t({label:'CSAT',value:fmtP(k.csat),
      delta:rel(k.csat,p.csat),goodWhen:'up',deltaLabel:vsLbl,
-     sub:'zufriedene Bewertungen'});
+     sub:'zufriedene Bewertungen',statusKey:'csat',statusVal:k.csat});
   t({label:'Automation Rate',value:fmtP(k.auto_all),
      delta:rel(k.auto_all,p.auto_all),goodWhen:'up',deltaLabel:vsLbl,
-     sub:'aller Tickets'});
+     sub:'aller Tickets',statusKey:'auto_all',statusVal:k.auto_all});
   t({label:'Savings by RDR',value:fmtEuro(k.savings_rdr),
      delta:rel(k.savings_rdr,p.savings_rdr),goodWhen:'up',deltaLabel:vsLbl,
      sub:'Net Money Contribution'});
   t({label:'Cost per Ticket',value:fmtEuro2(k.cpt),
      delta:rel(k.cpt,p.cpt),goodWhen:'down',deltaLabel:vsLbl,
-     sub:'inkl. Chatbot-Tickets'});
+     sub:'inkl. Chatbot-Tickets',statusKey:'cpt',statusVal:k.cpt});
   t({label:'Average Handling Time',value:fmtMin(k.aht),
      delta:rel(k.aht,p.aht),goodWhen:'down',deltaLabel:vsLbl,
-     sub:'Ø gewichtet über alle Agents'});
+     sub:'Ø gewichtet über alle Agents',statusKey:'aht',statusVal:k.aht});
 }
 
 document.getElementById('week-title').textContent='KW '+cur.kw;
 const tiles=document.getElementById('tiles');
 tiles.append(
-  tile('Created Tickets (KW '+cur.kw+')',fmtN(cur.created),rel(cur.created,prev.created),'down'),
-  tile('CSAT',fmtP(cur.csat),rel(cur.csat,prev.csat),'up'),
-  tile('Median First Reply',fmtH(cur.mtfr),rel(cur.mtfr,prev.mtfr),'down'),
-  tile('Automation Rate (alle Tickets)',fmtP(maC.auto_all),rel(maC.auto_all,maP.auto_all),'up'),
-  tile('Refund Decline Rate',fmtP(rfC.decline_rate),rel(rfC.decline_rate,rfP.decline_rate),'up'),
+  tile('Erstellte Tickets (KW '+cur.kw+')',fmtN(cur.created),rel(cur.created,prev.created),'down'),
+  tile('CSAT',fmtP(cur.csat),rel(cur.csat,prev.csat),'up','csat',cur.csat),
+  tile('Median First Reply Time',fmtH(cur.mtfr),rel(cur.mtfr,prev.mtfr),'down','mtfr',cur.mtfr),
+  tile('Automation Rate (alle Tickets)',fmtP(maC.auto_all),rel(maC.auto_all,maP.auto_all),'up','auto_all',maC.auto_all),
+  tile('Refund Decline Rate',fmtP(rfC.decline_rate),rel(rfC.decline_rate,rfP.decline_rate),'up','decline_rate',rfC.decline_rate),
   tile('Weekly Savings (MoinAI)',fmtEuro(maC.savings),rel(maC.savings,maP.savings),'up'),
   tile('Net Contribution (Refunds)',fmtEuro(rfC.net),rel(rfC.net,rfP.net),'up'),
-  tile('Cost per Ticket ('+(coC.month||'–')+')',fmtEuro2(coC.cpt),null,null)
+  tile('Cost per Ticket ('+(coC.month||'–')+')',fmtEuro2(coC.cpt),null,null,'cpt',coC.cpt)
 );
 
 const C={s1:css('--s1'),s2:css('--s2'),s3:css('--s3'),s4:css('--s4'),s5:css('--s5'),s6:css('--s6'),s7:css('--s7'),s8:css('--s8')};
@@ -918,15 +1065,15 @@ chartCard(document.getElementById('sec-hubspot'),{
             {name:'Partner',color:C.s2,values:hs.map(r=>r.partner)}]}
 });
 chartCard(document.getElementById('sec-hubspot'),{
-  title:'CSAT',hint:'Anteil zufriedener Bewertungen',
+  title:'CSAT',hint:'Anteil zufriedener Bewertungen · graue Linie: 4-Perioden-Trend',
   table:{cols:['Zeitraum','CSAT'],rows:hs.map(r=>[r.label,fmtP(r.csat)])},
-  spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',labelLast:true,
+  spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',target:0.60,trend:true,
     series:[{name:'CSAT',color:C.s2,values:hs.map(r=>r.csat),fmt:fmtP}]}
 });
 chartCard(document.getElementById('sec-hubspot'),{
-  title:'Median First Reply Time',hint:'Stunden bis zur ersten Antwort (Median)',
+  title:'Median First Reply Time',hint:'Stunden bis zur ersten Antwort (Median) · graue Linie: 4-Perioden-Trend',
   table:{cols:['Zeitraum','MTFR (h)'],rows:hs.map(r=>[r.label,fmtH(r.mtfr)])},
-  spec:{defaultView:'linie',labels:kwl,yFmt:v=>v+' h',labelLast:true,
+  spec:{defaultView:'linie',labels:kwl,yFmt:v=>v+' h',target:12,trend:true,
     series:[{name:'MTFR',color:C.s1,values:hs.map(r=>r.mtfr),fmt:fmtH}]}
 });
 chartCard(document.getElementById('sec-hubspot'),{
@@ -952,7 +1099,7 @@ chartCard(document.getElementById('sec-moinai'),{
           {name:'Alle Tickets',color:C.s2,type:'line'}],
   table:{cols:['Zeitraum','Chatbot','Alle Tickets'],
     rows:ma.map(r=>[r.label,fmtP(r.auto_bot),fmtP(r.auto_all)])},
-  spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',labelSeries:1,
+  spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',labelSeries:1,target:0.25,
     series:[{name:'Chatbot',color:C.s1,values:ma.map(r=>r.auto_bot),fmt:fmtP},
             {name:'Alle Tickets',color:C.s2,values:ma.map(r=>r.auto_all),fmt:fmtP}]}
 });
@@ -969,11 +1116,49 @@ chartCard(document.getElementById('sec-moinai'),{
     series:[{name:'Takeovers',color:C.s2,values:ma.map(r=>r.takeovers),fmt:fmtN}]}
 });
 
+/* MoinAI ROI: Savings vs. Flat Fee (monatlich, nur intern) */
+if(!META.public){
+  const y=new Date().getFullYear();
+  const savByMonth={};
+  D.moinai.forEach(r=>{const m=MONTHS_DE[monthOfKW(r.kw)];
+    if(r.savings!=null)savByMonth[m]=(savByMonth[m]||0)+r.savings;});
+  const roiRows=co.filter(c=>c.moinai_fee&&savByMonth[c.month])
+    .map(c=>({month:c.month,fee:c.moinai_fee,sav:savByMonth[c.month],
+              roi:savByMonth[c.month]/c.moinai_fee}));
+  Object.keys(savByMonth).forEach(m=>{
+    if(!roiRows.some(r=>r.month===m)&&co.length){
+      const fee=co[co.length-1].moinai_fee;
+      if(fee)roiRows.push({month:m,fee:fee,sav:savByMonth[m],roi:savByMonth[m]/fee});
+    }});
+  if(roiRows.length){
+    const lastR=roiRows[roiRows.length-1];
+    chartCard(document.getElementById('sec-moinai'),{
+      title:'Chatbot-ROI: Savings vs. Kosten',
+      hint:'Monatliche Ersparnis vs. MoinAI Flat Fee · '+lastR.month+': '+
+        lastR.roi.toLocaleString('de-DE',{maximumFractionDigits:1})+'× ROI',
+      legend:[{name:'Savings',color:C.s2,type:'line'},{name:'Flat Fee',color:C.s6,type:'line'}],
+      table:{cols:['Monat','Savings','Flat Fee','ROI'],
+        rows:roiRows.map(r=>[r.month,fmtEuro(r.sav),fmtEuro(r.fee),
+          r.roi.toLocaleString('de-DE',{maximumFractionDigits:1})+'×'])},
+      spec:{defaultView:'linie',labels:roiRows.map(r=>r.month),yFmt:fmtN,
+        series:[{name:'Savings',color:C.s2,values:roiRows.map(r=>r.sav),fmt:fmtEuro},
+                {name:'Flat Fee',color:C.s6,values:roiRows.map(r=>r.fee),fmt:fmtEuro}]}
+    });
+  }
+}
+
 /* Team */
 const agents=['Eli','Jeanine','Vivien','Jan'];
 const agentColors=[C.s1,C.s2,C.s3,C.s5];
+const notesTxt=(function(){
+  const parts=[];
+  tm.forEach(r=>agents.forEach(a=>{
+    if(r[a]&&r[a].note)parts.push(a+' '+r.label+': '+r[a].note);}));
+  return parts.length?'Hinweise: '+parts.join(' · '):null;
+})();
 chartCard(document.getElementById('sec-team'),{
-  title:'Messages pro Agent',hint:'Gesendete Nachrichten',
+  title:'Messages pro Agent',
+  hint:notesTxt?'Gesendete Nachrichten · '+notesTxt:'Gesendete Nachrichten',
   legend:agents.map((a,i)=>({name:a,color:agentColors[i],type:'line'})),
   table:{cols:['Zeitraum',...agents],
     rows:tm.map(r=>[r.label,...agents.map(a=>fmtN(r[a].messages))])},
@@ -981,6 +1166,24 @@ chartCard(document.getElementById('sec-team'),{
     series:agents.map((a,i)=>({name:a,color:agentColors[i],
       values:tm.map(r=>r[a].messages),fmt:fmtN}))}
 });
+(function(){
+  const withHours=agents.filter((a,i)=>tm.some(r=>r[a]&&r[a].active_hours&&r[a].messages));
+  if(!withHours.length)return;
+  chartCard(document.getElementById('sec-team'),{
+    title:'Messages pro Aktivstunde',
+    hint:'Produktivität fair verglichen: Nachrichten ÷ aktive Stunden (nur Agents mit erfassten Aktivstunden)',
+    legend:withHours.map(a=>({name:a,color:agentColors[agents.indexOf(a)],type:'line'})),
+    table:{cols:['Zeitraum',...withHours],
+      rows:tm.map(r=>[r.label,...withHours.map(a=>{
+        const m=r[a].messages,h=r[a].active_hours;
+        return (m&&h)?(m/h).toLocaleString('de-DE',{maximumFractionDigits:1}):'–';})])},
+    spec:{defaultView:'linie',labels:tm.map(r=>r.label),
+      yFmt:v=>v.toLocaleString('de-DE',{maximumFractionDigits:0}),
+      series:withHours.map(a=>({name:a,color:agentColors[agents.indexOf(a)],
+        values:tm.map(r=>(r[a].messages&&r[a].active_hours)?r[a].messages/r[a].active_hours:null),
+        fmt:v=>v.toLocaleString('de-DE',{maximumFractionDigits:1})+' / h'}))}
+  });
+})();
 chartCard(document.getElementById('sec-team'),{
   title:'Ø Handling Time pro Agent',hint:'Minuten pro Vorgang',
   legend:agents.map((a,i)=>({name:a,color:agentColors[i],type:'line'})),
@@ -1005,7 +1208,7 @@ chartCard(document.getElementById('sec-refunds'),{
 chartCard(document.getElementById('sec-refunds'),{
   title:'Refund Decline Rate',hint:'Anteil abgelehnter Refund-Anfragen',
   table:{cols:['Zeitraum','Decline Rate'],rows:rf.map(r=>[r.label,fmtP(r.decline_rate)])},
-  spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',labelLast:true,
+  spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',target:0.90,trend:true,
     series:[{name:'Decline Rate',color:C.s8,values:rf.map(r=>r.decline_rate),fmt:fmtP}]}
 });
 chartCard(document.getElementById('sec-refunds'),{
@@ -1016,6 +1219,15 @@ chartCard(document.getElementById('sec-refunds'),{
   spec:{defaultView:'linie',labels:kwl,yFmt:fmtN,
     series:[{name:'Netto',color:C.s8,values:rf.map(r=>r.net),fmt:fmtEuro},
             {name:'Brutto',color:C.s3,values:rf.map(r=>r.gross),fmt:fmtEuro}]}
+});
+chartCard(document.getElementById('sec-refunds'),{
+  title:'Contribution pro Refund-Ticket',
+  hint:'Netto gesichertes Geld je Refund-Anfrage (Effizienz der Ablehnungen)',
+  table:{cols:['Zeitraum','Netto je Ticket'],
+    rows:rf.map(r=>[r.label,(r.net&&r.refund_tickets)?fmtEuro2(r.net/r.refund_tickets):'–'])},
+  spec:{defaultView:'linie',labels:kwl,yFmt:v=>v+' €',
+    series:[{name:'Netto je Ticket',color:C.s8,
+      values:rf.map(r=>(r.net&&r.refund_tickets)?r.net/r.refund_tickets:null),fmt:fmtEuro2}]}
 });
 chartCard(document.getElementById('sec-refunds'),{
   title:'Share of Refund Tickets',hint:'Anteil der Refund-Tickets am Gesamtvolumen',
@@ -1034,7 +1246,7 @@ chartCard(document.getElementById('sec-costs'),{
       rows:co.map(r=>[r.month,fmtN(r.tickets),fmtEuro2(r.cpt)])}
     :{cols:['Monat','Kosten gesamt','Tickets','CPT'],
       rows:co.map(r=>[r.month,fmtEuro(r.total_cost),fmtN(r.tickets),fmtEuro2(r.cpt)])},
-  spec:{defaultView:'linie',labels:coL,yFmt:v=>v+' €',labelLast:true,
+  spec:{defaultView:'linie',labels:coL,yFmt:v=>v+' €',target:2.5,
     series:[{name:'CPT',color:C.s3,values:co.map(r=>r.cpt),fmt:fmtEuro2}]}
 });
 if(!META.public){

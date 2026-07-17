@@ -13,6 +13,7 @@
     --s1:#2a78d6; --s2:#1baf7a; --s3:#eda100; --s4:#008300;
     --s5:#4a3aa7; --s6:#e34948; --s7:#e87ba4; --s8:#eb6834;
     --good:#006300; --bad:#d03b3b;
+    --st-good:#0ca30c; --st-warn:#eda100; --st-crit:#d03b3b;
   }
   @media (prefers-color-scheme: dark){
     :root{
@@ -65,6 +66,19 @@
   .tile .delta{font-size:12px;margin-top:3px;color:var(--ink-3);}
   .tile .delta.up{color:var(--good)} .tile .delta.down{color:var(--bad)}
   .tile .sub{color:var(--ink-3);font-size:12px;margin-top:2px;}
+  .tile .goal{color:var(--ink-3);font-size:11px;margin-top:4px;}
+  .tile.st-good{border-left:3px solid var(--st-good);}
+  .tile.st-warn{border-left:3px solid var(--st-warn);}
+  .tile.st-crit{border-left:3px solid var(--st-crit);}
+  .tile .stdot{display:inline-block;width:9px;height:9px;border-radius:50%;
+    margin-right:7px;vertical-align:2px;}
+  .insights{background:var(--surface-1);border:1px solid var(--border);
+    border-radius:10px;padding:14px 18px;margin-top:18px;}
+  .insights h2{font-size:13.5px;font-weight:650;margin:0 0 8px;}
+  .insights .row{display:flex;gap:9px;align-items:baseline;
+    font-size:13px;margin:5px 0;color:var(--ink-2);}
+  .insights .dot{flex:none;width:9px;height:9px;border-radius:50%;
+    position:relative;top:1px;}
   .tile .split{color:var(--ink-2);font-size:12px;margin-top:4px;}
   .km .tile .value{font-size:30px;}
   .km .tile{padding:16px 18px;}
@@ -127,6 +141,8 @@
     </div>
   </header>
 
+  <div class="insights" id="insights" style="display:none"></div>
+
   <div class="section-title" style="--acc:var(--s3)">⭐ Key Metrics — <span id="km-title"></span><span class="rule"></span></div>
   <div class="tiles km" id="kmtiles"></div>
 
@@ -152,7 +168,7 @@
 </div>
 
 <script>
-const DATA = {"hubspot": [{"kw": 23, "created": 1046.0, "user": 857.0, "partner": 189.0, "messages": 1526.0, "csat": 0.4, "mtfr": 18.1, "msg_per_ticket": 0.6854521625}, {"kw": 24, "created": 988.0, "user": 841.0, "partner": 147.0, "messages": 1386.0, "csat": 0.55, "mtfr": 12.1, "msg_per_ticket": 0.7128427128}, {"kw": 25, "created": 1036.0, "user": 815.0, "partner": 221.0, "messages": 1338.0, "csat": 0.4, "mtfr": 13.7, "msg_per_ticket": 0.7742899851}, {"kw": 26, "created": 1055.0, "user": 940.0, "partner": 115.0, "messages": 1636.0, "csat": 0.4, "mtfr": 15.8, "msg_per_ticket": 0.6448655257}, {"kw": 27, "created": 1155.0, "user": 903.0, "partner": 252.0, "messages": 1515.0, "csat": 0.4, "mtfr": 15.6, "msg_per_ticket": 0.7623762376}], "moinai": [{"kw": 23, "conv_hubspot": 1046.0, "conv_chatbot": 624.0, "conv_total": 1670.0, "share_chatbot": 0.3736526946, "takeovers": 230.0, "solved_bot": 394.0, "auto_bot": 0.6314102564, "auto_all": 0.2359281437, "cost_per_ticket": 3.205128205, "savings": 8839.74359}, {"kw": 24, "conv_hubspot": 988.0, "conv_chatbot": 600.0, "conv_total": 1588.0, "share_chatbot": 0.3778337531, "takeovers": 228.0, "solved_bot": 372.0, "auto_bot": 0.62, "auto_all": 0.234256927, "cost_per_ticket": 3.333333333, "savings": 8680.0}, {"kw": 25, "conv_hubspot": 1036.0, "conv_chatbot": 581.0, "conv_total": 1617.0, "share_chatbot": 0.3593073593, "takeovers": 227.0, "solved_bot": 354.0, "auto_bot": 0.6092943201, "auto_all": 0.2189239332, "cost_per_ticket": 3.442340792, "savings": 8530.120482}, {"kw": 26, "conv_hubspot": 1055.0, "conv_chatbot": 645.0, "conv_total": 1700.0, "share_chatbot": 0.3794117647, "takeovers": 247.0, "solved_bot": 398.0, "auto_bot": 0.6170542636, "auto_all": 0.2341176471, "cost_per_ticket": 3.100775194, "savings": 8638.75969}, {"kw": 27, "conv_hubspot": 1155.0, "conv_chatbot": 585.0, "conv_total": 1740.0, "share_chatbot": 0.3362068966, "takeovers": 251.0, "solved_bot": 334.0, "auto_bot": 0.5709401709, "auto_all": 0.191954023, "cost_per_ticket": 3.418803419, "savings": 7993.162393}], "team": [{"kw": 23, "Eli": {"messages": 740.0, "aht": 1.53}, "Jeanine": {"messages": 438.0, "aht": 2.42}, "Vivien": {"messages": 229.0, "aht": 2.11}, "Jan": {"messages": 56.0, "aht": 2.51}}, {"kw": 24, "Eli": {"messages": 800.0, "aht": 1.7}, "Jeanine": {"messages": 0.0, "aht": null}, "Vivien": {"messages": 338.0, "aht": 2.28}, "Jan": {"messages": 248.0, "aht": 2.0}}, {"kw": 25, "Eli": {"messages": 550.0, "aht": 1.93}, "Jeanine": {"messages": 429.0, "aht": 2.37}, "Vivien": {"messages": 279.0, "aht": 2.98}, "Jan": {"messages": 80.0, "aht": 3.07}}, {"kw": 26, "Eli": {"messages": 700.0, "aht": 1.57}, "Jeanine": {"messages": 531.0, "aht": 2.1}, "Vivien": {"messages": 340.0, "aht": 1.74}, "Jan": {"messages": 65.0, "aht": 1.94}}, {"kw": 27, "Eli": {"messages": 150.0, "aht": 1.82}, "Jeanine": {"messages": 1239.0, "aht": 2.16}, "Vivien": {"messages": 380.0, "aht": 2.09}, "Jan": {"messages": 277.0, "aht": 2.13}}], "refunds": [{"kw": 23, "total": 1046.0, "refund_tickets": 392.0, "positive": 36.0, "negative": 356.0, "decline_rate": 0.9081632653, "share": 0.3747609943, "net": 11477.44, "gross": 13656.16}, {"kw": 24, "total": 988.0, "refund_tickets": 450.0, "positive": 41.0, "negative": 409.0, "decline_rate": 0.9088888889, "share": 0.455465587, "net": 13186.16, "gross": 15689.24}, {"kw": 25, "total": 1036.0, "refund_tickets": 408.0, "positive": 26.0, "negative": 382.0, "decline_rate": 0.9362745098, "share": 0.3938223938, "net": 12315.68, "gross": 14653.52}, {"kw": 26, "total": 1055.0, "refund_tickets": 419.0, "positive": 35.0, "negative": 384.0, "decline_rate": 0.9164677804, "share": 0.3971563981, "net": 12380.16, "gross": 14730.24}, {"kw": 27, "total": 1155.0, "refund_tickets": 397.0, "positive": 33.0, "negative": 364.0, "decline_rate": 0.9168765743, "share": 0.3437229437, "net": 11735.36, "gross": 13963.04}], "costs": [{"month": "Januar", "total_cost": null, "tickets": 7140.0, "cpt": 3.026880112, "tickets_hs": 4767.0, "tickets_cb": 2373.0}, {"month": "Februar", "total_cost": null, "tickets": 7086.0, "cpt": 2.595004234, "tickets_hs": 4896.0, "tickets_cb": 2190.0}, {"month": "M\u00e4rz", "total_cost": null, "tickets": 9707.0, "cpt": 1.959297414, "tickets_hs": 5727.0, "tickets_cb": 3980.0}, {"month": "April", "total_cost": null, "tickets": 7679.0, "cpt": 2.082048444, "tickets_hs": 4467.0, "tickets_cb": 3212.0}, {"month": "Mai", "total_cost": null, "tickets": 6566.0, "cpt": 2.392945477, "tickets_hs": 3989.0, "tickets_cb": 2577.0}, {"month": "Juni", "total_cost": null, "tickets": 7049.0, "cpt": 2.147046862, "tickets_hs": 4398.0, "tickets_cb": 2651.0}], "keymetrics": {"cur": {"month": "Juni", "tickets_hs": 4398.0, "tickets_cb": 2651.0, "tickets_total": 7049.0, "mtfr": 14.925, "csat": 0.4375, "auto_all": 0.23080666275, "savings_rdr": 49359.44, "cpt": 2.147046862, "aht": 1.9800103039670276}, "prev": {"month": "Mai", "tickets_hs": 3989.0, "tickets_cb": 2577.0, "tickets_total": 6566.0, "mtfr": null, "csat": null, "auto_all": null, "savings_rdr": null, "cpt": 2.392945477, "aht": null}, "prev_month": "Mai"}};
+const DATA = {"hubspot": [{"kw": 23, "created": 1046.0, "user": 857.0, "partner": 189.0, "messages": 1526.0, "csat": 0.4, "mtfr": 18.1, "msg_per_ticket": 0.6854521625}, {"kw": 24, "created": 988.0, "user": 841.0, "partner": 147.0, "messages": 1386.0, "csat": 0.55, "mtfr": 12.1, "msg_per_ticket": 0.7128427128}, {"kw": 25, "created": 1036.0, "user": 815.0, "partner": 221.0, "messages": 1338.0, "csat": 0.4, "mtfr": 13.7, "msg_per_ticket": 0.7742899851}, {"kw": 26, "created": 1055.0, "user": 940.0, "partner": 115.0, "messages": 1636.0, "csat": 0.4, "mtfr": 15.8, "msg_per_ticket": 0.6448655257}, {"kw": 27, "created": 1155.0, "user": 903.0, "partner": 252.0, "messages": 1515.0, "csat": 0.4, "mtfr": 15.6, "msg_per_ticket": 0.7623762376}], "moinai": [{"kw": 23, "conv_hubspot": 1046.0, "conv_chatbot": 624.0, "conv_total": 1670.0, "share_chatbot": 0.3736526946, "takeovers": 230.0, "solved_bot": 394.0, "auto_bot": 0.6314102564, "auto_all": 0.2359281437, "cost_per_ticket": 3.205128205, "savings": 8839.74359}, {"kw": 24, "conv_hubspot": 988.0, "conv_chatbot": 600.0, "conv_total": 1588.0, "share_chatbot": 0.3778337531, "takeovers": 228.0, "solved_bot": 372.0, "auto_bot": 0.62, "auto_all": 0.234256927, "cost_per_ticket": 3.333333333, "savings": 8680.0}, {"kw": 25, "conv_hubspot": 1036.0, "conv_chatbot": 581.0, "conv_total": 1617.0, "share_chatbot": 0.3593073593, "takeovers": 227.0, "solved_bot": 354.0, "auto_bot": 0.6092943201, "auto_all": 0.2189239332, "cost_per_ticket": 3.442340792, "savings": 8530.120482}, {"kw": 26, "conv_hubspot": 1055.0, "conv_chatbot": 645.0, "conv_total": 1700.0, "share_chatbot": 0.3794117647, "takeovers": 247.0, "solved_bot": 398.0, "auto_bot": 0.6170542636, "auto_all": 0.2341176471, "cost_per_ticket": 3.100775194, "savings": 8638.75969}, {"kw": 27, "conv_hubspot": 1155.0, "conv_chatbot": 585.0, "conv_total": 1740.0, "share_chatbot": 0.3362068966, "takeovers": 251.0, "solved_bot": 334.0, "auto_bot": 0.5709401709, "auto_all": 0.191954023, "cost_per_ticket": 3.418803419, "savings": 7993.162393}], "team": [{"kw": 23, "Eli": {"messages": 740.0, "aht": 1.53, "active_hours": 18.87, "note": null}, "Jeanine": {"messages": 438.0, "aht": 2.42, "active_hours": 17.666, "note": null}, "Vivien": {"messages": 229.0, "aht": 2.11, "active_hours": null, "note": null}, "Jan": {"messages": 56.0, "aht": 2.51, "active_hours": null, "note": null}}, {"kw": 24, "Eli": {"messages": 800.0, "aht": 1.7, "active_hours": 22.66666667, "note": null}, "Jeanine": {"messages": 0.0, "aht": null, "active_hours": null, "note": "Holiday"}, "Vivien": {"messages": 338.0, "aht": 2.28, "active_hours": null, "note": null}, "Jan": {"messages": 248.0, "aht": 2.0, "active_hours": null, "note": null}}, {"kw": 25, "Eli": {"messages": 550.0, "aht": 1.93, "active_hours": 17.69166667, "note": null}, "Jeanine": {"messages": 429.0, "aht": 2.37, "active_hours": 16.9455, "note": null}, "Vivien": {"messages": 279.0, "aht": 2.98, "active_hours": null, "note": null}, "Jan": {"messages": 80.0, "aht": 3.07, "active_hours": null, "note": null}}, {"kw": 26, "Eli": {"messages": 700.0, "aht": 1.57, "active_hours": 18.31666667, "note": null}, "Jeanine": {"messages": 531.0, "aht": 2.1, "active_hours": 18.585, "note": null}, "Vivien": {"messages": 340.0, "aht": 1.74, "active_hours": null, "note": null}, "Jan": {"messages": 65.0, "aht": 1.94, "active_hours": null, "note": null}}, {"kw": 27, "Eli": {"messages": 150.0, "aht": 1.82, "active_hours": 4.55, "note": "Holiday"}, "Jeanine": {"messages": 1239.0, "aht": 2.16, "active_hours": 44.604, "note": null}, "Vivien": {"messages": 380.0, "aht": 2.09, "active_hours": null, "note": null}, "Jan": {"messages": 277.0, "aht": 2.13, "active_hours": null, "note": null}}], "refunds": [{"kw": 23, "total": 1046.0, "refund_tickets": 392.0, "positive": 36.0, "negative": 356.0, "decline_rate": 0.9081632653, "share": 0.3747609943, "net": 11477.44, "gross": 13656.16}, {"kw": 24, "total": 988.0, "refund_tickets": 450.0, "positive": 41.0, "negative": 409.0, "decline_rate": 0.9088888889, "share": 0.455465587, "net": 13186.16, "gross": 15689.24}, {"kw": 25, "total": 1036.0, "refund_tickets": 408.0, "positive": 26.0, "negative": 382.0, "decline_rate": 0.9362745098, "share": 0.3938223938, "net": 12315.68, "gross": 14653.52}, {"kw": 26, "total": 1055.0, "refund_tickets": 419.0, "positive": 35.0, "negative": 384.0, "decline_rate": 0.9164677804, "share": 0.3971563981, "net": 12380.16, "gross": 14730.24}, {"kw": 27, "total": 1155.0, "refund_tickets": 397.0, "positive": 33.0, "negative": 364.0, "decline_rate": 0.9168765743, "share": 0.3437229437, "net": 11735.36, "gross": 13963.04}], "costs": [{"month": "Januar", "total_cost": null, "tickets": 7140.0, "cpt": 3.026880112, "tickets_hs": 4767.0, "tickets_cb": 2373.0, "moinai_fee": 2000.0}, {"month": "Februar", "total_cost": null, "tickets": 7086.0, "cpt": 2.595004234, "tickets_hs": 4896.0, "tickets_cb": 2190.0, "moinai_fee": 2000.0}, {"month": "M\u00e4rz", "total_cost": null, "tickets": 9707.0, "cpt": 1.959297414, "tickets_hs": 5727.0, "tickets_cb": 3980.0, "moinai_fee": 2000.0}, {"month": "April", "total_cost": null, "tickets": 7679.0, "cpt": 2.082048444, "tickets_hs": 4467.0, "tickets_cb": 3212.0, "moinai_fee": 2000.0}, {"month": "Mai", "total_cost": null, "tickets": 6566.0, "cpt": 2.392945477, "tickets_hs": 3989.0, "tickets_cb": 2577.0, "moinai_fee": 2000.0}, {"month": "Juni", "total_cost": null, "tickets": 7049.0, "cpt": 2.147046862, "tickets_hs": 4398.0, "tickets_cb": 2651.0, "moinai_fee": 2000.0}], "keymetrics": {"cur": {"month": "Juni", "tickets_hs": 4398.0, "tickets_cb": 2651.0, "tickets_total": 7049.0, "mtfr": 14.925, "csat": 0.4375, "auto_all": 0.23080666275, "savings_rdr": 49359.44, "cpt": 2.147046862, "aht": 1.9800103039670276}, "prev": {"month": "Mai", "tickets_hs": 3989.0, "tickets_cb": 2577.0, "tickets_total": 6566.0, "mtfr": null, "csat": null, "auto_all": null, "savings_rdr": null, "cpt": 2.392945477, "aht": null}, "prev_month": "Mai"}};
 const META = {"source": "NeoTaste_CS_Main_KPI_Sheet.xlsx", "updated": "17.07.2026", "public": true};
 
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
@@ -163,11 +179,32 @@ const fmtEuro2 = v => v==null?'–':v.toLocaleString('de-DE',{minimumFractionDig
 const fmtH = v => v==null?'–':v.toLocaleString('de-DE',{maximumFractionDigits:1})+' h';
 const fmtMin = v => v==null?'–':v.toLocaleString('de-DE',{maximumFractionDigits:2})+' min';
 
+/* ---------- Zielwerte & Ampel-Logik ---------- */
+const TARGETS={
+  csat:{dir:'up',good:0.60,warn:0.45,goal:'Ziel ≥ 60 %',line:0.60},
+  mtfr:{dir:'down',good:12,warn:18,goal:'Ziel ≤ 12 h',line:12},
+  auto_all:{dir:'up',good:0.25,warn:0.18,goal:'Ziel ≥ 25 %',line:0.25},
+  decline_rate:{dir:'up',good:0.90,warn:0.85,goal:'Ziel ≥ 90 %',line:0.90},
+  cpt:{dir:'down',good:2.5,warn:3.5,goal:'Ziel ≤ 2,50 €',line:2.5},
+  aht:{dir:'down',good:2.5,warn:3.5,goal:'Ziel ≤ 2,5 min',line:2.5},
+};
+function statusOf(key,v){
+  const t=TARGETS[key];
+  if(!t||v==null)return null;
+  if(t.dir==='up')return v>=t.good?'good':(v>=t.warn?'warn':'crit');
+  return v<=t.good?'good':(v<=t.warn?'warn':'crit');
+}
+const ST_COL={good:'--st-good',warn:'--st-warn',crit:'--st-crit'};
+
 /* ---------- Tiles ---------- */
-function tile(label, value, delta, goodWhen){ // goodWhen: 'up'|'down'|null
-  const el = document.createElement('div'); el.className='tile';
+function tile(label, value, delta, goodWhen, statusKey, statusVal){
+  const st=statusKey?statusOf(statusKey,statusVal):null;
+  const el = document.createElement('div'); el.className='tile'+(st?' st-'+st:'');
   const l = document.createElement('div'); l.className='label'; l.textContent=label;
-  const v = document.createElement('div'); v.className='value'; v.textContent=value;
+  const v = document.createElement('div'); v.className='value';
+  if(st){const dot=document.createElement('span');dot.className='stdot';
+    dot.style.background=css(ST_COL[st]);v.append(dot);}
+  v.append(document.createTextNode(value));
   el.append(l,v);
   if(delta!=null && isFinite(delta)){
     const d = document.createElement('div');
@@ -179,17 +216,23 @@ function tile(label, value, delta, goodWhen){ // goodWhen: 'up'|'down'|null
     d.textContent=(delta>=0?'▲ +':'▼ −')+pct+' % vs. Vorwoche';
     el.append(d);
   }
+  if(statusKey&&TARGETS[statusKey]){const g=document.createElement('div');
+    g.className='goal';g.textContent=TARGETS[statusKey].goal;el.append(g);}
   return el;
 }
 function rel(cur,prev){ return (cur!=null&&prev!=null&&prev!==0)?(cur-prev)/prev:null; }
 
-function kmTile({label,value,delta,goodWhen,deltaLabel,sub,split}){
-  const el=document.createElement('div');el.className='tile';
+function kmTile({label,value,delta,goodWhen,deltaLabel,sub,split,statusKey,statusVal}){
+  const st=statusKey?statusOf(statusKey,statusVal):null;
+  const el=document.createElement('div');el.className='tile'+(st?' st-'+st:'');
   const l=document.createElement('div');l.className='label';l.textContent=label;
   el.append(l);
   if(split){const sp=document.createElement('div');sp.className='split';
     sp.textContent=split;el.append(sp);}
-  const v=document.createElement('div');v.className='value';v.textContent=value;
+  const v=document.createElement('div');v.className='value';
+  if(st){const dot=document.createElement('span');dot.className='stdot';
+    dot.style.background=css(ST_COL[st]);v.append(dot);}
+  v.append(document.createTextNode(value));
   el.append(v);
   const d=document.createElement('div');
   if(delta!=null&&isFinite(delta)){
@@ -202,6 +245,8 @@ function kmTile({label,value,delta,goodWhen,deltaLabel,sub,split}){
   }
   el.append(d);
   if(sub){const s=document.createElement('div');s.className='sub';s.textContent=sub;el.append(s);}
+  if(statusKey&&TARGETS[statusKey]){const g=document.createElement('div');
+    g.className='goal';g.textContent=TARGETS[statusKey].goal;el.append(g);}
   return el;
 }
 
@@ -321,10 +366,28 @@ function tooltipFor(chartEl){
 }
 
 /* Line chart: series=[{name,color,values,fmt}], area: Flächen-Variante */
-function lineChart(el,{labels,series,yFmt,labelSeries,area}){
+function lineChart(el,{labels,series,yFmt,labelSeries,area,target,trend}){
   const svg=makeSvg();el.append(svg);
-  const max=Math.max(...series.flatMap(s=>s.values.filter(v=>v!=null)));
+  let max=Math.max(...series.flatMap(s=>s.values.filter(v=>v!=null)));
+  if(target!=null)max=Math.max(max,target*1.08);
   const y=frame(svg,max,yFmt);
+  if(target!=null){ // gestrichelte Ziellinie
+    const tl=line(svg,M.l,y(target),W-M.r,y(target),css('--ink-3'),1);
+    tl.setAttribute('stroke-dasharray','5 4');tl.setAttribute('opacity','.65');
+    text(svg,W-M.r,y(target)-4,'Ziel','end',9.5);
+  }
+  if(trend&&series.length===1&&labels.length>=4){ // 4-Perioden-Trend
+    const vals=series[0].values;
+    const tv=vals.map((_,i)=>{
+      const w=vals.slice(Math.max(0,i-3),i+1).filter(v=>v!=null);
+      return w.length?w.reduce((a,b)=>a+b)/w.length:null;});
+    const x0=i=>M.l+(labels.length===1?0.5:(i/(labels.length-1)))*(W-M.l-M.r);
+    const d=tv.map((v,i)=>v==null?'':((i===0||tv[i-1]==null)?'M':'L')+x0(i)+' '+y(v)).join(' ');
+    const tp=document.createElementNS(svg.namespaceURI,'path');
+    tp.setAttribute('d',d);tp.setAttribute('fill','none');
+    tp.setAttribute('stroke',css('--baseline'));tp.setAttribute('stroke-width',2);
+    tp.setAttribute('opacity','.8');svg.append(tp);
+  }
   const x=i=>M.l+(labels.length===1?0.5:(i/(labels.length-1)))*(W-M.l-M.r);
   labels.forEach((lb,i)=>text(svg,x(i),H-M.b+15,lb,'middle'));
   const cross=line(svg,0,M.t,0,H-M.b,css('--baseline'),1);cross.setAttribute('opacity','0');
@@ -436,10 +499,17 @@ function pieChart(el,{labels,series,yFmt}){
 }
 
 /* Bar chart, optionally stacked: series=[{name,color,values,fmt}] */
-function barChart(el,{labels,series,yFmt,totalLabelLast}){
+function barChart(el,{labels,series,yFmt,totalLabelLast,target}){
   const svg=makeSvg();el.append(svg);
   const totals=labels.map((_,i)=>series.reduce((a,s)=>a+(s.values[i]||0),0));
-  const y=frame(svg,Math.max(...totals),yFmt);
+  let bmax=Math.max(...totals);
+  if(target!=null)bmax=Math.max(bmax,target*1.08);
+  const y=frame(svg,bmax,yFmt);
+  if(target!=null){
+    const tl=line(svg,M.l,y(target),W-M.r,y(target),css('--ink-3'),1);
+    tl.setAttribute('stroke-dasharray','5 4');tl.setAttribute('opacity','.65');
+    text(svg,W-M.r,y(target)-4,'Ziel','end',9.5);
+  }
   const band=(W-M.l-M.r)/labels.length, bw=Math.min(24,band*0.5);
   const surf=css('--surface-1');
   const tt=tooltipFor(el);
@@ -536,10 +606,14 @@ function buildLiveData(hsT,maT,tmT,rfT){
   const ma=dataRows(parseCSV(maT)).map(r=>({kw:Math.round(n(r[0])),conv_hubspot:n(r[1]),
     conv_chatbot:n(r[2]),conv_total:n(r[3]),share_chatbot:n(r[4]),takeovers:n(r[5]),
     solved_bot:n(r[6]),auto_bot:n(r[7]),auto_all:n(r[8]),savings:n(r[10])}));
-  const AG={Eli:[0,1,2],Jeanine:[6,7,8],Vivien:[12,13,14],Jan:[17,18,19]};
+  const AG={Eli:[0,1,2,3,5],Jeanine:[6,7,8,9,11],Vivien:[12,13,14,15,16],Jan:[17,18,19,20,21]};
   const tm=dataRows(parseCSV(tmT)).map(r=>{
     const o={kw:Math.round(n(r[0]))};
-    for(const[a,[,mc,ac]]of Object.entries(AG))o[a]={messages:n(r[mc]),aht:n(r[ac])};
+    for(const[a,[,mc,ac,hc,nc]]of Object.entries(AG)){
+      let note=(r[nc]||'').trim();
+      if(note==='/'||note==='')note=null;
+      o[a]={messages:n(r[mc]),aht:n(r[ac]),active_hours:n(r[hc]),note:note};
+    }
     return o;});
   const rf=dataRows(parseCSV(rfT)).map(r=>({kw:Math.round(n(r[0])),total:n(r[1]),
     refund_tickets:n(r[2]),positive:n(r[3]),negative:n(r[4]),decline_rate:n(r[5]),
@@ -633,8 +707,12 @@ function aggregate(D,period){
     ['Eli','Jeanine','Vivien','Jan'].forEach(a=>{
       const ms=b.rows.map(r=>r[a].messages).filter(v=>v!=null);
       const ah=b.rows.map(r=>r[a].aht).filter(v=>v!=null);
+      const hh=b.rows.map(r=>r[a].active_hours).filter(v=>v!=null);
+      const nt=b.rows.map(r=>r[a].note).filter(Boolean);
       o[a]={messages:ms.length?ms.reduce((x,z)=>x+z):null,
-            aht:ah.length?ah.reduce((x,z)=>x+z)/ah.length:null};});
+            aht:ah.length?ah.reduce((x,z)=>x+z)/ah.length:null,
+            active_hours:hh.length?hh.reduce((x,z)=>x+z):null,
+            note:nt.length?nt.join(', '):null};});
     return o;});
   return Object.assign({},D,{hubspot:hs,moinai:ma,team:tm,refunds:rf});
 }
@@ -665,6 +743,70 @@ document.getElementById('subline').textContent=
 document.getElementById('footline').textContent=
   `Quelle: NeoTaste CS KPI-Liste (Google Sheets) · ${standTxt} · Zeitraum: KW ${D.hubspot[0].kw}–${cur.kw}`;
 
+/* Aufmerksamkeit: automatische Abweichungs-Hinweise */
+(function(){
+  const box=document.getElementById('insights');
+  const items=[];
+  const RW=D.hubspot,RM=D.moinai,RR=D.refunds;
+  const lastOf=a=>a[a.length-1],prevOf=a=>a[a.length-2];
+  function streak(rows,f,key){
+    let n=0;
+    for(let i=rows.length-1;i>=0;i--){
+      const st=statusOf(key,rows[i][f]);
+      if(st==='warn'||st==='crit')n++;else break;
+    }
+    return n;
+  }
+  const streaks=[
+    [RW,'csat','csat','CSAT',v=>fmtP(v)],
+    [RW,'mtfr','mtfr','Median First Reply Time',v=>fmtH(v)],
+    [RM,'auto_all','auto_all','Automation Rate',v=>fmtP(v)],
+    [RR,'decline_rate','decline_rate','Refund Decline Rate',v=>fmtP(v)],
+  ];
+  streaks.forEach(([rows,f,key,name,fmt])=>{
+    const n=streak(rows,f,key);
+    const cv=lastOf(rows)[f];
+    if(n>=2)items.push({sev:3,st:statusOf(key,cv),
+      txt:name+' verfehlt das Ziel seit '+n+' Wochen (aktuell '+fmt(cv)+' · '+TARGETS[key].goal.replace('Ziel ','Ziel: ')+').'});
+    else if(n===1)items.push({sev:1,st:statusOf(key,cv),
+      txt:name+' liegt diese Woche unter Ziel ('+fmt(cv)+' · '+TARGETS[key].goal.replace('Ziel ','Ziel: ')+').'});
+  });
+  const moves=[
+    [RW,'created','Erstellte Tickets','down',fmtN],
+    [RW,'mtfr','Median First Reply Time','down',fmtH],
+    [RM,'auto_all','Automation Rate','up',fmtP],
+    [RM,'savings','Weekly Savings','up',fmtEuro],
+    [RR,'net','Net Contribution','up',fmtEuro],
+  ];
+  moves.forEach(([rows,f,name,goodDir,fmt])=>{
+    const c=lastOf(rows),pv=prevOf(rows);
+    if(!c||!pv||c[f]==null||!pv[f])return;
+    const d=(c[f]-pv[f])/pv[f];
+    if(Math.abs(d)<0.10)return;
+    const good=(d>=0)===(goodDir==='up');
+    items.push({sev:2,st:good?'good':'warn',
+      txt:name+' '+(d>=0?'+':'−')+(Math.abs(d)*100).toLocaleString('de-DE',{maximumFractionDigits:0})+' % vs. Vorwoche ('+fmt(c[f])+').'});
+  });
+  const created=RW.map(r=>r.created).filter(v=>v!=null);
+  if(created.length>=3&&lastOf(RW).created===Math.max(...created))
+    items.push({sev:1,st:'warn',txt:'Erstellte Tickets erreichen mit '+fmtN(lastOf(RW).created)+' den höchsten Wochenwert seit Beginn der Aufzeichnung.'});
+  items.sort((a,b)=>b.sev-a.sev);
+  const top=items.slice(0,5);
+  box.replaceChildren();
+  if(!top.length){box.style.display='none';}
+  else{
+    box.style.display='';
+    const h=document.createElement('h2');h.textContent='🔎 Aufmerksamkeit — KW '+lastOf(RW).kw;box.append(h);
+    top.forEach(it=>{
+      const row=document.createElement('div');row.className='row';
+      const dot=document.createElement('span');dot.className='dot';
+      dot.style.background=css(ST_COL[it.st]||'--st-warn');
+      const t=document.createElement('span');t.textContent=it.txt;
+      row.append(dot,t);box.append(row);
+    });
+  }
+})();
+
 /* Key Metrics (Monatssicht) */
 const KM=computeKeymetrics(D);
 if(KM&&KM.cur){
@@ -679,37 +821,37 @@ if(KM&&KM.cur){
            (k.tickets_cb!=null?' · '+fmtN(k.tickets_cb)+' CB':''),
      delta:rel(k.tickets_total,p.tickets_total),goodWhen:'down',
      deltaLabel:vsLbl,sub:'Tickets gesamt (HubSpot + Chatbot)'});
-  t({label:'Median Time to First Reply',value:fmtH(k.mtfr),
+  t({label:'Median First Reply Time',value:fmtH(k.mtfr),
      delta:rel(k.mtfr,p.mtfr),goodWhen:'down',deltaLabel:vsLbl,
-     sub:'Ø der Wochen-Mediane'});
+     sub:'Ø der Wochen-Mediane',statusKey:'mtfr',statusVal:k.mtfr});
   t({label:'CSAT',value:fmtP(k.csat),
      delta:rel(k.csat,p.csat),goodWhen:'up',deltaLabel:vsLbl,
-     sub:'zufriedene Bewertungen'});
+     sub:'zufriedene Bewertungen',statusKey:'csat',statusVal:k.csat});
   t({label:'Automation Rate',value:fmtP(k.auto_all),
      delta:rel(k.auto_all,p.auto_all),goodWhen:'up',deltaLabel:vsLbl,
-     sub:'aller Tickets'});
+     sub:'aller Tickets',statusKey:'auto_all',statusVal:k.auto_all});
   t({label:'Savings by RDR',value:fmtEuro(k.savings_rdr),
      delta:rel(k.savings_rdr,p.savings_rdr),goodWhen:'up',deltaLabel:vsLbl,
      sub:'Net Money Contribution'});
   t({label:'Cost per Ticket',value:fmtEuro2(k.cpt),
      delta:rel(k.cpt,p.cpt),goodWhen:'down',deltaLabel:vsLbl,
-     sub:'inkl. Chatbot-Tickets'});
+     sub:'inkl. Chatbot-Tickets',statusKey:'cpt',statusVal:k.cpt});
   t({label:'Average Handling Time',value:fmtMin(k.aht),
      delta:rel(k.aht,p.aht),goodWhen:'down',deltaLabel:vsLbl,
-     sub:'Ø gewichtet über alle Agents'});
+     sub:'Ø gewichtet über alle Agents',statusKey:'aht',statusVal:k.aht});
 }
 
 document.getElementById('week-title').textContent='KW '+cur.kw;
 const tiles=document.getElementById('tiles');
 tiles.append(
-  tile('Created Tickets (KW '+cur.kw+')',fmtN(cur.created),rel(cur.created,prev.created),'down'),
-  tile('CSAT',fmtP(cur.csat),rel(cur.csat,prev.csat),'up'),
-  tile('Median First Reply',fmtH(cur.mtfr),rel(cur.mtfr,prev.mtfr),'down'),
-  tile('Automation Rate (alle Tickets)',fmtP(maC.auto_all),rel(maC.auto_all,maP.auto_all),'up'),
-  tile('Refund Decline Rate',fmtP(rfC.decline_rate),rel(rfC.decline_rate,rfP.decline_rate),'up'),
+  tile('Erstellte Tickets (KW '+cur.kw+')',fmtN(cur.created),rel(cur.created,prev.created),'down'),
+  tile('CSAT',fmtP(cur.csat),rel(cur.csat,prev.csat),'up','csat',cur.csat),
+  tile('Median First Reply Time',fmtH(cur.mtfr),rel(cur.mtfr,prev.mtfr),'down','mtfr',cur.mtfr),
+  tile('Automation Rate (alle Tickets)',fmtP(maC.auto_all),rel(maC.auto_all,maP.auto_all),'up','auto_all',maC.auto_all),
+  tile('Refund Decline Rate',fmtP(rfC.decline_rate),rel(rfC.decline_rate,rfP.decline_rate),'up','decline_rate',rfC.decline_rate),
   tile('Weekly Savings (MoinAI)',fmtEuro(maC.savings),rel(maC.savings,maP.savings),'up'),
   tile('Net Contribution (Refunds)',fmtEuro(rfC.net),rel(rfC.net,rfP.net),'up'),
-  tile('Cost per Ticket ('+(coC.month||'–')+')',fmtEuro2(coC.cpt),null,null)
+  tile('Cost per Ticket ('+(coC.month||'–')+')',fmtEuro2(coC.cpt),null,null,'cpt',coC.cpt)
 );
 
 const C={s1:css('--s1'),s2:css('--s2'),s3:css('--s3'),s4:css('--s4'),s5:css('--s5'),s6:css('--s6'),s7:css('--s7'),s8:css('--s8')};
@@ -725,15 +867,15 @@ chartCard(document.getElementById('sec-hubspot'),{
             {name:'Partner',color:C.s2,values:hs.map(r=>r.partner)}]}
 });
 chartCard(document.getElementById('sec-hubspot'),{
-  title:'CSAT',hint:'Anteil zufriedener Bewertungen',
+  title:'CSAT',hint:'Anteil zufriedener Bewertungen · graue Linie: 4-Perioden-Trend',
   table:{cols:['Zeitraum','CSAT'],rows:hs.map(r=>[r.label,fmtP(r.csat)])},
-  spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',labelLast:true,
+  spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',target:0.60,trend:true,
     series:[{name:'CSAT',color:C.s2,values:hs.map(r=>r.csat),fmt:fmtP}]}
 });
 chartCard(document.getElementById('sec-hubspot'),{
-  title:'Median First Reply Time',hint:'Stunden bis zur ersten Antwort (Median)',
+  title:'Median First Reply Time',hint:'Stunden bis zur ersten Antwort (Median) · graue Linie: 4-Perioden-Trend',
   table:{cols:['Zeitraum','MTFR (h)'],rows:hs.map(r=>[r.label,fmtH(r.mtfr)])},
-  spec:{defaultView:'linie',labels:kwl,yFmt:v=>v+' h',labelLast:true,
+  spec:{defaultView:'linie',labels:kwl,yFmt:v=>v+' h',target:12,trend:true,
     series:[{name:'MTFR',color:C.s1,values:hs.map(r=>r.mtfr),fmt:fmtH}]}
 });
 chartCard(document.getElementById('sec-hubspot'),{
@@ -759,7 +901,7 @@ chartCard(document.getElementById('sec-moinai'),{
           {name:'Alle Tickets',color:C.s2,type:'line'}],
   table:{cols:['Zeitraum','Chatbot','Alle Tickets'],
     rows:ma.map(r=>[r.label,fmtP(r.auto_bot),fmtP(r.auto_all)])},
-  spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',labelSeries:1,
+  spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',labelSeries:1,target:0.25,
     series:[{name:'Chatbot',color:C.s1,values:ma.map(r=>r.auto_bot),fmt:fmtP},
             {name:'Alle Tickets',color:C.s2,values:ma.map(r=>r.auto_all),fmt:fmtP}]}
 });
@@ -776,11 +918,49 @@ chartCard(document.getElementById('sec-moinai'),{
     series:[{name:'Takeovers',color:C.s2,values:ma.map(r=>r.takeovers),fmt:fmtN}]}
 });
 
+/* MoinAI ROI: Savings vs. Flat Fee (monatlich, nur intern) */
+if(!META.public){
+  const y=new Date().getFullYear();
+  const savByMonth={};
+  D.moinai.forEach(r=>{const m=MONTHS_DE[monthOfKW(r.kw)];
+    if(r.savings!=null)savByMonth[m]=(savByMonth[m]||0)+r.savings;});
+  const roiRows=co.filter(c=>c.moinai_fee&&savByMonth[c.month])
+    .map(c=>({month:c.month,fee:c.moinai_fee,sav:savByMonth[c.month],
+              roi:savByMonth[c.month]/c.moinai_fee}));
+  Object.keys(savByMonth).forEach(m=>{
+    if(!roiRows.some(r=>r.month===m)&&co.length){
+      const fee=co[co.length-1].moinai_fee;
+      if(fee)roiRows.push({month:m,fee:fee,sav:savByMonth[m],roi:savByMonth[m]/fee});
+    }});
+  if(roiRows.length){
+    const lastR=roiRows[roiRows.length-1];
+    chartCard(document.getElementById('sec-moinai'),{
+      title:'Chatbot-ROI: Savings vs. Kosten',
+      hint:'Monatliche Ersparnis vs. MoinAI Flat Fee · '+lastR.month+': '+
+        lastR.roi.toLocaleString('de-DE',{maximumFractionDigits:1})+'× ROI',
+      legend:[{name:'Savings',color:C.s2,type:'line'},{name:'Flat Fee',color:C.s6,type:'line'}],
+      table:{cols:['Monat','Savings','Flat Fee','ROI'],
+        rows:roiRows.map(r=>[r.month,fmtEuro(r.sav),fmtEuro(r.fee),
+          r.roi.toLocaleString('de-DE',{maximumFractionDigits:1})+'×'])},
+      spec:{defaultView:'linie',labels:roiRows.map(r=>r.month),yFmt:fmtN,
+        series:[{name:'Savings',color:C.s2,values:roiRows.map(r=>r.sav),fmt:fmtEuro},
+                {name:'Flat Fee',color:C.s6,values:roiRows.map(r=>r.fee),fmt:fmtEuro}]}
+    });
+  }
+}
+
 /* Team */
 const agents=['Eli','Jeanine','Vivien','Jan'];
 const agentColors=[C.s1,C.s2,C.s3,C.s5];
+const notesTxt=(function(){
+  const parts=[];
+  tm.forEach(r=>agents.forEach(a=>{
+    if(r[a]&&r[a].note)parts.push(a+' '+r.label+': '+r[a].note);}));
+  return parts.length?'Hinweise: '+parts.join(' · '):null;
+})();
 chartCard(document.getElementById('sec-team'),{
-  title:'Messages pro Agent',hint:'Gesendete Nachrichten',
+  title:'Messages pro Agent',
+  hint:notesTxt?'Gesendete Nachrichten · '+notesTxt:'Gesendete Nachrichten',
   legend:agents.map((a,i)=>({name:a,color:agentColors[i],type:'line'})),
   table:{cols:['Zeitraum',...agents],
     rows:tm.map(r=>[r.label,...agents.map(a=>fmtN(r[a].messages))])},
@@ -788,6 +968,24 @@ chartCard(document.getElementById('sec-team'),{
     series:agents.map((a,i)=>({name:a,color:agentColors[i],
       values:tm.map(r=>r[a].messages),fmt:fmtN}))}
 });
+(function(){
+  const withHours=agents.filter((a,i)=>tm.some(r=>r[a]&&r[a].active_hours&&r[a].messages));
+  if(!withHours.length)return;
+  chartCard(document.getElementById('sec-team'),{
+    title:'Messages pro Aktivstunde',
+    hint:'Produktivität fair verglichen: Nachrichten ÷ aktive Stunden (nur Agents mit erfassten Aktivstunden)',
+    legend:withHours.map(a=>({name:a,color:agentColors[agents.indexOf(a)],type:'line'})),
+    table:{cols:['Zeitraum',...withHours],
+      rows:tm.map(r=>[r.label,...withHours.map(a=>{
+        const m=r[a].messages,h=r[a].active_hours;
+        return (m&&h)?(m/h).toLocaleString('de-DE',{maximumFractionDigits:1}):'–';})])},
+    spec:{defaultView:'linie',labels:tm.map(r=>r.label),
+      yFmt:v=>v.toLocaleString('de-DE',{maximumFractionDigits:0}),
+      series:withHours.map(a=>({name:a,color:agentColors[agents.indexOf(a)],
+        values:tm.map(r=>(r[a].messages&&r[a].active_hours)?r[a].messages/r[a].active_hours:null),
+        fmt:v=>v.toLocaleString('de-DE',{maximumFractionDigits:1})+' / h'}))}
+  });
+})();
 chartCard(document.getElementById('sec-team'),{
   title:'Ø Handling Time pro Agent',hint:'Minuten pro Vorgang',
   legend:agents.map((a,i)=>({name:a,color:agentColors[i],type:'line'})),
@@ -812,7 +1010,7 @@ chartCard(document.getElementById('sec-refunds'),{
 chartCard(document.getElementById('sec-refunds'),{
   title:'Refund Decline Rate',hint:'Anteil abgelehnter Refund-Anfragen',
   table:{cols:['Zeitraum','Decline Rate'],rows:rf.map(r=>[r.label,fmtP(r.decline_rate)])},
-  spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',labelLast:true,
+  spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',target:0.90,trend:true,
     series:[{name:'Decline Rate',color:C.s8,values:rf.map(r=>r.decline_rate),fmt:fmtP}]}
 });
 chartCard(document.getElementById('sec-refunds'),{
@@ -823,6 +1021,15 @@ chartCard(document.getElementById('sec-refunds'),{
   spec:{defaultView:'linie',labels:kwl,yFmt:fmtN,
     series:[{name:'Netto',color:C.s8,values:rf.map(r=>r.net),fmt:fmtEuro},
             {name:'Brutto',color:C.s3,values:rf.map(r=>r.gross),fmt:fmtEuro}]}
+});
+chartCard(document.getElementById('sec-refunds'),{
+  title:'Contribution pro Refund-Ticket',
+  hint:'Netto gesichertes Geld je Refund-Anfrage (Effizienz der Ablehnungen)',
+  table:{cols:['Zeitraum','Netto je Ticket'],
+    rows:rf.map(r=>[r.label,(r.net&&r.refund_tickets)?fmtEuro2(r.net/r.refund_tickets):'–'])},
+  spec:{defaultView:'linie',labels:kwl,yFmt:v=>v+' €',
+    series:[{name:'Netto je Ticket',color:C.s8,
+      values:rf.map(r=>(r.net&&r.refund_tickets)?r.net/r.refund_tickets:null),fmt:fmtEuro2}]}
 });
 chartCard(document.getElementById('sec-refunds'),{
   title:'Share of Refund Tickets',hint:'Anteil der Refund-Tickets am Gesamtvolumen',
@@ -841,7 +1048,7 @@ chartCard(document.getElementById('sec-costs'),{
       rows:co.map(r=>[r.month,fmtN(r.tickets),fmtEuro2(r.cpt)])}
     :{cols:['Monat','Kosten gesamt','Tickets','CPT'],
       rows:co.map(r=>[r.month,fmtEuro(r.total_cost),fmtN(r.tickets),fmtEuro2(r.cpt)])},
-  spec:{defaultView:'linie',labels:coL,yFmt:v=>v+' €',labelLast:true,
+  spec:{defaultView:'linie',labels:coL,yFmt:v=>v+' €',target:2.5,
     series:[{name:'CPT',color:C.s3,values:co.map(r=>r.cpt),fmt:fmtEuro2}]}
 });
 if(!META.public){
