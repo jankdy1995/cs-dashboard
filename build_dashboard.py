@@ -285,6 +285,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     font-size:13px;margin:5px 0;color:var(--ink-2);}
   .insights .dot{flex:none;width:9px;height:9px;border-radius:50%;
     position:relative;top:1px;}
+  .chev-km{color:var(--ink-3);font-size:11px;transition:transform .15s;}
+  #kmTitleRow.open .chev-km{transform:rotate(180deg);}
   .tile .split{color:var(--ink-2);font-size:12px;margin-top:4px;}
   .km .tile .value{font-size:30px;}
   .km .tile{padding:16px 18px;}
@@ -349,8 +351,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
   <div class="insights" id="insights" style="display:none"></div>
 
-  <div class="section-title" style="--acc:var(--s3)">⭐ Key Metrics — <span id="km-title"></span><span class="rule"></span></div>
-  <div class="tiles km" id="kmtiles"></div>
+  <div class="section-title" style="--acc:var(--s3);cursor:pointer;user-select:none" id="kmTitleRow">⭐ Key Metrics — <span id="km-title"></span><span class="rule"></span><span class="chev-km" id="kmChev">▼</span></div>
+  <div class="tiles km" id="kmtiles" style="display:none"></div>
 
   <div class="section-title" style="--acc:var(--s1)">📆 Aktuelle Woche — <span id="week-title"></span><span class="rule"></span></div>
   <div class="tiles" id="tiles"></div>
@@ -387,9 +389,9 @@ const fmtMin = v => v==null?'–':v.toLocaleString('de-DE',{maximumFractionDigit
 
 /* ---------- Zielwerte & Ampel-Logik ---------- */
 const TARGETS={
-  csat:{dir:'up',good:0.60,warn:0.45,goal:'Ziel ≥ 60 %',line:0.60},
-  mtfr:{dir:'down',good:12,warn:18,goal:'Ziel ≤ 12 h',line:12},
-  auto_all:{dir:'up',good:0.25,warn:0.18,goal:'Ziel ≥ 25 %',line:0.25},
+  csat:{dir:'up',good:0.71,warn:0.51,goal:'Ziel ≥ 71 %',line:0.71},
+  mtfr:{dir:'down',good:24,warn:36,goal:'Ziel < 24 h',line:24},
+  auto_all:{dir:'up',good:0.30,warn:-1,goal:'Ziel ≥ 30 %',line:0.30}, // unter Ziel = Gelb
   decline_rate:{dir:'up',good:0.90,warn:0.85,goal:'Ziel ≥ 90 %',line:0.90},
   cpt:{dir:'down',good:2.5,warn:3.5,goal:'Ziel ≤ 2,50 €',line:2.5},
   aht:{dir:'down',good:2.5,warn:3.5,goal:'Ziel ≤ 2,5 min',line:2.5},
@@ -1059,6 +1061,8 @@ if(KM&&KM.cur){
      delta:rel(k.aht,p.aht),goodWhen:'down',deltaLabel:vsLbl,
      sub:'Ø gewichtet über alle Agents',statusKey:'aht',statusVal:k.aht});
 }
+document.getElementById('kmtiles').style.display=window.__kmOpen?'':'none';
+document.getElementById('kmTitleRow').classList.toggle('open',!!window.__kmOpen);
 
 document.getElementById('week-title').textContent='KW '+cur.kw;
 const tiles=document.getElementById('tiles');
@@ -1088,13 +1092,13 @@ chartCard(document.getElementById('sec-hubspot'),{
 chartCard(document.getElementById('sec-hubspot'),{
   title:'CSAT',hint:'Anteil zufriedener Bewertungen · graue Linie: 4-Perioden-Trend',
   table:{cols:['Zeitraum','CSAT'],rows:hs.map(r=>[r.label,fmtP(r.csat)])},
-  spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',target:0.60,trend:true,
+  spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',target:0.71,trend:true,
     series:[{name:'CSAT',color:C.s2,values:hs.map(r=>r.csat),fmt:fmtP}]}
 });
 chartCard(document.getElementById('sec-hubspot'),{
   title:'Median First Reply Time',hint:'Stunden bis zur ersten Antwort (Median) · graue Linie: 4-Perioden-Trend',
   table:{cols:['Zeitraum','MTFR (h)'],rows:hs.map(r=>[r.label,fmtH(r.mtfr)])},
-  spec:{defaultView:'linie',labels:kwl,yFmt:v=>v+' h',target:12,trend:true,
+  spec:{defaultView:'linie',labels:kwl,yFmt:v=>v+' h',target:24,trend:true,
     series:[{name:'MTFR',color:C.s1,values:hs.map(r=>r.mtfr),fmt:fmtH}]}
 });
 chartCard(document.getElementById('sec-hubspot'),{
@@ -1120,7 +1124,7 @@ chartCard(document.getElementById('sec-moinai'),{
           {name:'Alle Tickets',color:C.s2,type:'line'}],
   table:{cols:['Zeitraum','Chatbot','Alle Tickets'],
     rows:ma.map(r=>[r.label,fmtP(r.auto_bot),fmtP(r.auto_all)])},
-  spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',labelSeries:1,target:0.25,
+  spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',labelSeries:1,target:0.30,
     series:[{name:'Chatbot',color:C.s1,values:ma.map(r=>r.auto_bot),fmt:fmtP},
             {name:'Alle Tickets',color:C.s2,values:ma.map(r=>r.auto_all),fmt:fmtP}]}
 });
@@ -1290,6 +1294,11 @@ periodSel.addEventListener('change',()=>{
   const u=new URL(location);u.searchParams.set('zeitraum',periodSel.value);
   history.replaceState(null,'',u);
   if(lastData)renderAll(lastData);
+});
+document.getElementById('kmTitleRow').addEventListener('click',()=>{
+  window.__kmOpen=!window.__kmOpen;
+  document.getElementById('kmtiles').style.display=window.__kmOpen?'':'none';
+  document.getElementById('kmTitleRow').classList.toggle('open',!!window.__kmOpen);
 });
 renderAll(DATA); // eingebettete Daten sofort zeigen — nie eine leere Seite
 
