@@ -93,6 +93,15 @@
     font-size:12px;line-height:1.5;color:var(--ink-2);width:min(280px,90%);
     display:none;pointer-events:none;}
   .info-pop b{color:var(--ink-1);display:block;margin-bottom:3px;font-size:12px;}
+  .explain-btn{background:none;border:none;color:var(--s1);font-size:12px;
+    cursor:pointer;padding:0;margin:2px 0 6px;font-family:inherit;
+    display:inline-flex;align-items:center;gap:5px;}
+  .explain-btn .chev{font-size:9px;transition:transform .15s;}
+  .explain-btn.open .chev{transform:rotate(180deg);}
+  .explain-box{display:none;background:var(--page);border:1px solid var(--grid);
+    border-radius:8px;padding:9px 12px;font-size:12px;line-height:1.5;
+    color:var(--ink-2);margin:0 0 8px;}
+  .explain-box.open{display:block;}
   .chev-km{color:var(--ink-3);font-size:11px;transition:transform .15s;}
   #kmTitleRow.open .chev-km{transform:rotate(180deg);}
   .tile .split{color:var(--ink-2);font-size:12px;margin-top:4px;}
@@ -314,7 +323,7 @@ function frame(svg,ymax,yFmt){
 
 const VIEWS=[['linie','Linie'],['balken','Balken'],['flaeche','Fläche'],
              ['kreis','Kreis'],['tabelle','Tabelle']];
-function chartCard(parent,{title,hint,width,legend,spec,table,hoverInfo}){
+function chartCard(parent,{title,hint,width,legend,spec,table,hoverInfo,explain}){
   const card=document.createElement('div');card.className='card'+(width?' '+width:'');
   if(hoverInfo)attachInfo(card,hoverInfo);
   const head=document.createElement('div');head.className='card-head';
@@ -326,6 +335,16 @@ function chartCard(parent,{title,hint,width,legend,spec,table,hoverInfo}){
   VIEWS.forEach(([v,lbl])=>{const o=document.createElement('option');
     o.value=v;o.textContent=lbl;sel.append(o);});
   head.append(hwrap,sel);card.append(head);
+  if(explain){
+    const btn=document.createElement('button');btn.className='explain-btn';
+    const chev=document.createElement('span');chev.className='chev';chev.textContent='▼';
+    btn.append(document.createTextNode('ℹ️ Wie wird das berechnet?'),chev);
+    const boxE=document.createElement('div');boxE.className='explain-box';
+    boxE.textContent=explain;
+    btn.addEventListener('click',()=>{btn.classList.toggle('open');
+      boxE.classList.toggle('open');});
+    card.append(btn,boxE);
+  }
   const legEl=document.createElement('div');legEl.className='legend';card.append(legEl);
   const chartEl=document.createElement('div');chartEl.className='chart';card.append(chartEl);
   const tblEl=document.createElement('div');tblEl.style.display='none';card.append(tblEl);
@@ -958,7 +977,7 @@ chartCard(document.getElementById('sec-moinai'),{
 });
 chartCard(document.getElementById('sec-moinai'),{
   title:'Savings',hint:'Ersparnis durch Chatbot-Automatisierung',
-  hoverInfo:'Berechnung: Direkt vom Chatbot gelöste Anfragen × Kosten pro Chatbot-Konversation × 7. Kosten pro Konversation = 2.000 € MoinAI-Flat-Fee ÷ Chatbot-Konversationen der Woche. Quelle: Sheet MoinAI_KPIs, Spalte \'Weekly Savings\'.',
+  explain:'Berechnung: Direkt vom Chatbot gelöste Anfragen × Kosten pro Chatbot-Konversation × 7. Kosten pro Konversation = 2.000 € MoinAI-Flat-Fee ÷ Chatbot-Konversationen der Woche. Quelle: Sheet MoinAI_KPIs, Spalte \'Weekly Savings\'.',
   table:{cols:['Zeitraum','Savings'],rows:ma.map(r=>[r.label,fmtEuro(r.savings)])},
   spec:{defaultView:'balken',labels:kwl,yFmt:v=>fmtN(v),totalLabelLast:true,
     series:[{name:'Savings',color:C.s2,values:ma.map(r=>r.savings),fmt:fmtEuro}]}
