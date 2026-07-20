@@ -354,7 +354,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   <div class="section-title" style="--acc:var(--s3);cursor:pointer;user-select:none" id="kmTitleRow">⭐ Key Metrics — <span id="km-title"></span><span class="rule"></span><span class="chev-km" id="kmChev">▼</span></div>
   <div class="tiles km" id="kmtiles" style="display:none"></div>
 
-  <div class="section-title" style="--acc:var(--s1)">📆 Aktuelle Woche — <span id="week-title"></span><span class="rule"></span></div>
+  <div class="section-title" style="--acc:var(--s1)">📆 Letzte Woche — <span id="week-title"></span><span class="rule"></span></div>
   <div class="tiles" id="tiles"></div>
 
   <div class="section-title" style="--acc:var(--s1)">🎫 Tickets &amp; Support (HubSpot)<span class="rule"></span></div>
@@ -405,9 +405,10 @@ function statusOf(key,v){
 const ST_COL={good:'--st-good',warn:'--st-warn',crit:'--st-crit'};
 
 /* ---------- Tiles ---------- */
-function tile(label, value, delta, goodWhen, statusKey, statusVal){
+function tile(label, value, delta, goodWhen, statusKey, statusVal, hoverInfo){
   const st=statusKey?statusOf(statusKey,statusVal):null;
   const el = document.createElement('div'); el.className='tile'+(st?' st-'+st:'');
+  if(hoverInfo)el.title=hoverInfo;
   const l = document.createElement('div'); l.className='label'; l.textContent=label;
   const v = document.createElement('div'); v.className='value';
   if(st){const dot=document.createElement('span');dot.className='stdot';
@@ -491,8 +492,9 @@ function frame(svg,ymax,yFmt){
 
 const VIEWS=[['linie','Linie'],['balken','Balken'],['flaeche','Fläche'],
              ['kreis','Kreis'],['tabelle','Tabelle']];
-function chartCard(parent,{title,hint,width,legend,spec,table}){
+function chartCard(parent,{title,hint,width,legend,spec,table,hoverInfo}){
   const card=document.createElement('div');card.className='card'+(width?' '+width:'');
+  if(hoverInfo)card.title=hoverInfo;
   const head=document.createElement('div');head.className='card-head';
   const hwrap=document.createElement('div');
   const h=document.createElement('h3');h.textContent=title;hwrap.append(h);
@@ -810,7 +812,8 @@ function dataRows(rows){ // Datenzeilen ab Zeile 4, Ende bei nicht-numerischer K
 function buildLiveData(hsT,maT,tmT,rfT){
   const n=parseNum;
   const hs=dataRows(parseCSV(hsT)).map(r=>({kw:Math.round(n(r[0])),created:n(r[1]),
-    user:n(r[2]),partner:n(r[3]),messages:n(r[4]),csat:n(r[5]),mtfr:n(r[6])}));
+    user:n(r[2]),partner:n(r[3]),messages:n(r[4]),csat:n(r[5]),mtfr:n(r[6]),
+    msg_per_ticket:n(r[7])}));
   const ma=dataRows(parseCSV(maT)).map(r=>({kw:Math.round(n(r[0])),conv_hubspot:n(r[1]),
     conv_chatbot:n(r[2]),conv_total:n(r[3]),share_chatbot:n(r[4]),takeovers:n(r[5]),
     solved_bot:n(r[6]),auto_bot:n(r[7]),auto_all:n(r[8]),savings:n(r[10])}));
@@ -947,7 +950,7 @@ const standTxt=D.live
   ?'Live aus Google Sheets · '+new Date().toLocaleString('de-DE',{dateStyle:'short',timeStyle:'short'})+' Uhr'
   :`Stand: ${META.updated} (letzter Build)`;
 document.getElementById('subline').textContent=
-  `Aktuelle Woche: KW ${cur.kw} · ${standTxt}`;
+  `Letzte Woche: KW ${cur.kw} · ${standTxt}`;
 document.getElementById('footline').textContent=
   `Quelle: NeoTaste CS KPI-Liste (Google Sheets) · ${standTxt} · Zeitraum: KW ${D.hubspot[0].kw}–${cur.kw}`;
 
@@ -1072,9 +1075,12 @@ tiles.append(
   tile('Median First Reply Time',fmtH(cur.mtfr),rel(cur.mtfr,prev.mtfr),'down','mtfr',cur.mtfr),
   tile('Automation Rate (alle Tickets)',fmtP(maC.auto_all),rel(maC.auto_all,maP.auto_all),'up','auto_all',maC.auto_all),
   tile('Refund Decline Rate',fmtP(rfC.decline_rate),rel(rfC.decline_rate,rfP.decline_rate),'up','decline_rate',rfC.decline_rate),
-  tile('Weekly Savings (MoinAI)',fmtEuro(maC.savings),rel(maC.savings,maP.savings),'up'),
+  tile('Weekly Savings (MoinAI)',fmtEuro(maC.savings),rel(maC.savings,maP.savings),'up',null,null,
+    'Berechnung: Direkt vom Chatbot gelöste Anfragen × Kosten pro Chatbot-Konversation × 7. Kosten pro Konversation = 2.000 € MoinAI-Flat-Fee ÷ Chatbot-Konversationen der Woche. Quelle: Sheet MoinAI_KPIs, Spalte \'Weekly Savings\'.'),
   tile('Net Contribution (Refunds)',fmtEuro(rfC.net),rel(rfC.net,rfP.net),'up'),
-  tile('Cost per Ticket ('+(coC.month||'–')+')',fmtEuro2(coC.cpt),null,null,'cpt',coC.cpt)
+  tile('Messages per Ticket',
+    cur.msg_per_ticket!=null?cur.msg_per_ticket.toLocaleString('de-DE',{maximumFractionDigits:2}):'–',
+    rel(cur.msg_per_ticket,prev.msg_per_ticket),'down')
 );
 
 const C={s1:css('--s1'),s2:css('--s2'),s3:css('--s3'),s4:css('--s4'),s5:css('--s5'),s6:css('--s6'),s7:css('--s7'),s8:css('--s8')};
@@ -1130,6 +1136,7 @@ chartCard(document.getElementById('sec-moinai'),{
 });
 chartCard(document.getElementById('sec-moinai'),{
   title:'Savings',hint:'Ersparnis durch Chatbot-Automatisierung',
+  hoverInfo:'Berechnung: Direkt vom Chatbot gelöste Anfragen × Kosten pro Chatbot-Konversation × 7. Kosten pro Konversation = 2.000 € MoinAI-Flat-Fee ÷ Chatbot-Konversationen der Woche. Quelle: Sheet MoinAI_KPIs, Spalte \'Weekly Savings\'.',
   table:{cols:['Zeitraum','Savings'],rows:ma.map(r=>[r.label,fmtEuro(r.savings)])},
   spec:{defaultView:'balken',labels:kwl,yFmt:v=>fmtN(v),totalLabelLast:true,
     series:[{name:'Savings',color:C.s2,values:ma.map(r=>r.savings),fmt:fmtEuro}]}
@@ -1183,7 +1190,8 @@ const notesTxt=(function(){
 })();
 chartCard(document.getElementById('sec-team'),{
   title:'Messages pro Agent',
-  hint:notesTxt?'Gesendete Nachrichten · '+notesTxt:'Gesendete Nachrichten',
+  hint:'Gesendete Nachrichten',
+  hoverInfo:notesTxt||undefined,
   legend:agents.map((a,i)=>({name:a,color:agentColors[i],type:'line'})),
   table:{cols:['Zeitraum',...agents],
     rows:tm.map(r=>[r.label,...agents.map(a=>fmtN(r[a].messages))])},
