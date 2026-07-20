@@ -285,6 +285,12 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     font-size:13px;margin:5px 0;color:var(--ink-2);}
   .insights .dot{flex:none;width:9px;height:9px;border-radius:50%;
     position:relative;top:1px;}
+  .info-pop{position:absolute;z-index:8;background:var(--surface-1);
+    border:1px solid var(--border);border-radius:8px;
+    box-shadow:0 6px 18px rgba(0,0,0,.16);padding:10px 13px;
+    font-size:12px;line-height:1.5;color:var(--ink-2);width:min(280px,90%);
+    display:none;pointer-events:none;}
+  .info-pop b{color:var(--ink-1);display:block;margin-bottom:3px;font-size:12px;}
   .chev-km{color:var(--ink-3);font-size:11px;transition:transform .15s;}
   #kmTitleRow.open .chev-km{transform:rotate(180deg);}
   .tile .split{color:var(--ink-2);font-size:12px;margin-top:4px;}
@@ -404,11 +410,25 @@ function statusOf(key,v){
 }
 const ST_COL={good:'--st-good',warn:'--st-warn',crit:'--st-crit'};
 
+/* Info-Popup beim Hovern (Berechnungs-Erklärungen) */
+function attachInfo(el,text,pos){
+  el.style.position='relative';
+  const pop=document.createElement('div');pop.className='info-pop';
+  const b=document.createElement('b');
+  b.textContent=text.startsWith('Hinweise:')?'ℹ️ Hinweise':'ℹ️ Wie wird das berechnet?';
+  pop.append(b,document.createTextNode(text));
+  if(pos==='below'){pop.style.left='0';pop.style.top='calc(100% + 6px)';}
+  else{pop.style.right='14px';pop.style.top='46px';}
+  el.append(pop);
+  el.addEventListener('pointerenter',()=>{pop.style.display='block';});
+  el.addEventListener('pointerleave',()=>{pop.style.display='none';});
+}
+
 /* ---------- Tiles ---------- */
 function tile(label, value, delta, goodWhen, statusKey, statusVal, hoverInfo){
   const st=statusKey?statusOf(statusKey,statusVal):null;
   const el = document.createElement('div'); el.className='tile'+(st?' st-'+st:'');
-  if(hoverInfo)el.title=hoverInfo;
+  if(hoverInfo)attachInfo(el,hoverInfo,'below');
   const l = document.createElement('div'); l.className='label'; l.textContent=label;
   const v = document.createElement('div'); v.className='value';
   if(st){const dot=document.createElement('span');dot.className='stdot';
@@ -494,7 +514,7 @@ const VIEWS=[['linie','Linie'],['balken','Balken'],['flaeche','Fläche'],
              ['kreis','Kreis'],['tabelle','Tabelle']];
 function chartCard(parent,{title,hint,width,legend,spec,table,hoverInfo}){
   const card=document.createElement('div');card.className='card'+(width?' '+width:'');
-  if(hoverInfo)card.title=hoverInfo;
+  if(hoverInfo)attachInfo(card,hoverInfo);
   const head=document.createElement('div');head.className='card-head';
   const hwrap=document.createElement('div');
   const h=document.createElement('h3');h.textContent=title;hwrap.append(h);
