@@ -1119,7 +1119,7 @@ tiles.append(
   tile('Net Contribution (Refunds)',fmtEuro(rfC.net),rel(rfC.net,rfP.net),'up'),
   tile('Messages per Ticket',
     cur.msg_per_ticket!=null?cur.msg_per_ticket.toLocaleString('de-DE',{maximumFractionDigits:2}):'–',
-    rel(cur.msg_per_ticket,prev.msg_per_ticket),'down')
+    rel(cur.msg_per_ticket,prev.msg_per_ticket),'up')
 );
 
 const C={s1:css('--s1'),s2:css('--s2'),s3:css('--s3'),s4:css('--s4'),s5:css('--s5'),s6:css('--s6'),s7:css('--s7'),s8:css('--s8')};
