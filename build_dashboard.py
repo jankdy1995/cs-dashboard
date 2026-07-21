@@ -55,15 +55,14 @@ def extract(path):
         'cost_per_ticket': num(r[9]), 'savings': num(r[10]),
     } for r in ma]
 
-    tp = rows('👥 Team_Performance', maxcol=29)
-    # Struktur (0-indexiert): Eli-Block ist erweitert (Contract/Projekt/Meeting/
-    # Hours Off, Relative/Absolute Working Hours, On-track-Spalte).
-    agents = {
-        'Eli':     {'msg': 1,  'aht': 2,  'act': 10, 'note': 8,  'rel': 9,  'abs': 10, 'ontrack': 11},
-        'Jeanine': {'msg': 13, 'aht': 14, 'act': 15, 'note': 17},
-        'Vivien':  {'msg': 19, 'aht': 20, 'act': 21, 'note': 22},
-        'Jan':     {'msg': 24, 'aht': 25, 'act': 26, 'note': 27},
-    }
+    tp = rows('👥 Team_Performance', maxcol=49)
+    # Alle vier Agent-Blöcke haben nun dieselbe 12-Spalten-Struktur:
+    # KW, Messages, AHT, AHT-Team, Contract, Projekt, Meeting, HoursOff, Note,
+    # Relative WH, Absolute WH, On track. Basis-Offsets: 0/12/24/36.
+    def blk(base):
+        return {'msg': base+1, 'aht': base+2, 'act': base+10, 'note': base+8,
+                'rel': base+9, 'abs': base+10, 'ontrack': base+11}
+    agents = {'Eli': blk(0), 'Jeanine': blk(12), 'Vivien': blk(24), 'Jan': blk(36)}
     d['team'] = []
     for r in tp:
         if num(r[0]) is None:
@@ -886,11 +885,8 @@ function buildLiveData(hsT,maT,tmT,rfT){
   const ma=dataRows(parseCSV(maT)).map(r=>({kw:Math.round(n(r[0])),conv_hubspot:n(r[1]),
     conv_chatbot:n(r[2]),conv_total:n(r[3]),share_chatbot:n(r[4]),takeovers:n(r[5]),
     solved_bot:n(r[6]),auto_bot:n(r[7]),auto_all:n(r[8]),savings:n(r[10])}));
-  const AG={
-    Eli:{msg:1,aht:2,act:10,note:8,rel:9,abs:10,ontrack:11},
-    Jeanine:{msg:13,aht:14,act:15,note:17},
-    Vivien:{msg:19,aht:20,act:21,note:22},
-    Jan:{msg:24,aht:25,act:26,note:27}};
+  const blk=b=>({msg:b+1,aht:b+2,act:b+10,note:b+8,rel:b+9,abs:b+10,ontrack:b+11});
+  const AG={Eli:blk(0),Jeanine:blk(12),Vivien:blk(24),Jan:blk(36)};
   const txt=v=>{v=(v||'').trim();return (v===''||v==='/')?null:v;};
   const tm=dataRows(parseCSV(tmT)).map(r=>{
     const o={kw:Math.round(n(r[0]))};
@@ -1289,7 +1285,11 @@ const agentColors=[C.s1,C.s2,C.s3,C.s5];
     const tr=document.createElement('tr');
     const nameTd=document.createElement('td');
     const dot=document.createElement('span');dot.className='stdot';dot.style.background=agentColors[i];
-    nameTd.append(dot,document.createTextNode(a+(r.note?' · '+r.note:'')));tr.append(nameTd);
+    nameTd.append(dot,document.createTextNode(a));tr.append(nameTd);
+    // AHT: letzte Woche, sonst jüngster verfügbarer Wert
+    let ahtVal=r.aht;
+    if(ahtVal==null)for(let j=D.team.length-1;j>=0;j--){
+      if(D.team[j][a]&&D.team[j][a].aht!=null){ahtVal=D.team[j][a].aht;break;}}
 
     const stTd=document.createElement('td');
     const badge=document.createElement('span');badge.className='badge '+(st||'na');
@@ -1299,7 +1299,7 @@ const agentColors=[C.s1,C.s2,C.s3,C.s5];
     const td=(txt)=>{const d=document.createElement('td');d.textContent=txt;return d;};
     const hh=v=>v!=null?v.toLocaleString('de-DE',{maximumFractionDigits:1})+' h':'–';
     tr.append(td(r.messages!=null?fmtN(r.messages):'–'));
-    tr.append(td(r.aht!=null?fmtMin(r.aht):'–'));
+    tr.append(td(ahtVal!=null?fmtMin(ahtVal):'–'));
     tr.append(td(hh(r.abs)));
     tr.append(td(hh(r.rel)));
     tbl.append(tr);
