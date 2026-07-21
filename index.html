@@ -1098,16 +1098,9 @@ const agentColors=[C.s1,C.s2,C.s3,C.s5];
   sec.append(card);
 })();
 
-const notesTxt=(function(){
-  const parts=[];
-  tm.forEach(r=>agents.forEach(a=>{
-    if(r[a]&&r[a].note)parts.push(a+' '+r.label+': '+r[a].note);}));
-  return parts.length?'Hinweise: '+parts.join(' · '):null;
-})();
 chartCard(document.getElementById('sec-team'),{
   title:'Messages pro Agent',
   hint:'Gesendete Nachrichten',
-  hoverInfo:notesTxt||undefined,
   legend:agents.map((a,i)=>({name:a,color:agentColors[i],type:'line'})),
   table:{cols:['Zeitraum',...agents],
     rows:tm.map(r=>[r.label,...agents.map(a=>fmtN(r[a].messages))])},
