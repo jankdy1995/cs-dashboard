@@ -61,7 +61,8 @@ def extract(path):
     # Relative WH, Absolute WH, On track. Basis-Offsets: 0/12/24/36.
     def blk(base):
         return {'msg': base+1, 'aht': base+2, 'act': base+10, 'note': base+8,
-                'rel': base+9, 'abs': base+10, 'ontrack': base+11}
+                'rel': base+9, 'abs': base+10, 'ontrack': base+11,
+                'contract': base+4, 'projekt': base+5, 'meeting': base+6, 'off': base+7}
     agents = {'Eli': blk(0), 'Jeanine': blk(12), 'Vivien': blk(24), 'Jan': blk(36)}
     d['team'] = []
     for r in tp:
@@ -83,6 +84,8 @@ def extract(path):
                 'active_hours': cell(m.get('act')), 'note': text(m.get('note')),
                 'rel': cell(m.get('rel')), 'abs': cell(m.get('abs')),
                 'ontrack': text(m.get('ontrack')),
+                'contract': cell(m.get('contract')), 'projekt': cell(m.get('projekt')),
+                'meeting': cell(m.get('meeting')), 'off': cell(m.get('off')),
             }
         d['team'].append(row)
 
@@ -885,7 +888,8 @@ function buildLiveData(hsT,maT,tmT,rfT){
   const ma=dataRows(parseCSV(maT)).map(r=>({kw:Math.round(n(r[0])),conv_hubspot:n(r[1]),
     conv_chatbot:n(r[2]),conv_total:n(r[3]),share_chatbot:n(r[4]),takeovers:n(r[5]),
     solved_bot:n(r[6]),auto_bot:n(r[7]),auto_all:n(r[8]),savings:n(r[10])}));
-  const blk=b=>({msg:b+1,aht:b+2,act:b+10,note:b+8,rel:b+9,abs:b+10,ontrack:b+11});
+  const blk=b=>({msg:b+1,aht:b+2,act:b+10,note:b+8,rel:b+9,abs:b+10,ontrack:b+11,
+    contract:b+4,projekt:b+5,meeting:b+6,off:b+7});
   const AG={Eli:blk(0),Jeanine:blk(12),Vivien:blk(24),Jan:blk(36)};
   const txt=v=>{v=(v||'').trim();return (v===''||v==='/')?null:v;};
   const tm=dataRows(parseCSV(tmT)).map(r=>{
@@ -893,9 +897,10 @@ function buildLiveData(hsT,maT,tmT,rfT){
     for(const[a,m]of Object.entries(AG)){
       o[a]={messages:n(r[m.msg]),aht:n(r[m.aht]),active_hours:n(r[m.act]),
             note:txt(r[m.note]),
-            rel:m.rel!=null?n(r[m.rel]):null,
-            abs:m.abs!=null?n(r[m.abs]):null,
-            ontrack:m.ontrack!=null?txt(r[m.ontrack]):null};
+            rel:n(r[m.rel]),abs:n(r[m.abs]),
+            ontrack:txt(r[m.ontrack]),
+            contract:n(r[m.contract]),projekt:n(r[m.projekt]),
+            meeting:n(r[m.meeting]),off:n(r[m.off])};
     }
     return o;});
   const rf=dataRows(parseCSV(rfT)).map(r=>({kw:Math.round(n(r[0])),total:n(r[1]),
@@ -1324,33 +1329,28 @@ chartCard(document.getElementById('sec-team'),{
     series:agents.map((a,i)=>({name:a,color:agentColors[i],
       values:tm.map(r=>r[a].messages),fmt:fmtN}))}
 });
+/* Kapazitäts-Aufteilung: woraus die Vertragsstunden je Agent bestehen (letzte Woche) */
 (function(){
-  const withHours=agents.filter((a,i)=>tm.some(r=>r[a]&&r[a].active_hours&&r[a].messages));
-  if(!withHours.length)return;
+  const last=D.team[D.team.length-1]||{};
+  if(!agents.some(a=>last[a]&&last[a].contract!=null))return;
+  const seg=f=>agents.map(a=>last[a]?last[a][f]:null);
+  const fh=v=>v!=null?v.toLocaleString('de-DE',{maximumFractionDigits:1})+' h':'–';
   chartCard(document.getElementById('sec-team'),{
-    title:'Messages pro Aktivstunde',
-    hint:'Produktivität fair verglichen: Nachrichten ÷ aktive Stunden (nur Agents mit erfassten Aktivstunden)',
-    legend:withHours.map(a=>({name:a,color:agentColors[agents.indexOf(a)],type:'line'})),
-    table:{cols:['Zeitraum',...withHours],
-      rows:tm.map(r=>[r.label,...withHours.map(a=>{
-        const m=r[a].messages,h=r[a].active_hours;
-        return (m&&h)?(m/h).toLocaleString('de-DE',{maximumFractionDigits:1}):'–';})])},
-    spec:{defaultView:'linie',labels:tm.map(r=>r.label),
-      yFmt:v=>v.toLocaleString('de-DE',{maximumFractionDigits:0}),
-      series:withHours.map(a=>({name:a,color:agentColors[agents.indexOf(a)],
-        values:tm.map(r=>(r[a].messages&&r[a].active_hours)?r[a].messages/r[a].active_hours:null),
-        fmt:v=>v.toLocaleString('de-DE',{maximumFractionDigits:1})+' / h'}))}
+    title:'Kapazitäts-Aufteilung',
+    hint:'Woraus die Vertragsstunden je Agent bestehen — KW '+(last.kw!=null?last.kw:'–'),
+    legend:[{name:'Support',color:C.s2},{name:'Projekt',color:C.s1},
+            {name:'Meetings',color:C.s3},{name:'Abwesenheit',color:C.s6}],
+    table:{cols:['Agent','Support','Projekt','Meetings','Abwesenheit','Vertrag'],
+      rows:agents.map(a=>{const r=last[a]||{};
+        return [a,fh(r.rel),fh(r.projekt),fh(r.meeting),fh(r.off),fh(r.contract)];})},
+    spec:{defaultView:'balken',labels:agents.slice(),
+      yFmt:v=>v.toLocaleString('de-DE',{maximumFractionDigits:0})+' h',
+      series:[{name:'Support',color:C.s2,values:seg('rel'),fmt:fh},
+              {name:'Projekt',color:C.s1,values:seg('projekt'),fmt:fh},
+              {name:'Meetings',color:C.s3,values:seg('meeting'),fmt:fh},
+              {name:'Abwesenheit',color:C.s6,values:seg('off'),fmt:fh}]}
   });
 })();
-chartCard(document.getElementById('sec-team'),{
-  title:'Ø Handling Time pro Agent',hint:'Minuten pro Vorgang',
-  legend:agents.map((a,i)=>({name:a,color:agentColors[i],type:'line'})),
-  table:{cols:['Zeitraum',...agents],
-    rows:tm.map(r=>[r.label,...agents.map(a=>fmtMin(r[a].aht))])},
-  spec:{defaultView:'linie',labels:tm.map(r=>r.label),yFmt:v=>v+' min',
-    series:agents.map((a,i)=>({name:a,color:agentColors[i],
-      values:tm.map(r=>r[a].aht),fmt:fmtMin}))}
-});
 
 /* Refunds */
 chartCard(document.getElementById('sec-refunds'),{
