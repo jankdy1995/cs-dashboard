@@ -1052,7 +1052,7 @@ const agentColors=[C.s1,C.s2,C.s3,C.s5];
   const h=document.createElement('h3');
   h.textContent='Agent-Status — KW '+(last.kw!=null?last.kw:'–');
   const hint=document.createElement('div');hint.className='hint';
-  hint.textContent='On Track, wenn die geleisteten (Ist-)Arbeitsstunden die geplanten (Soll-)Stunden erreichen — mit 4 h Kulanz.';
+  hint.textContent='Status direkt aus der Spalte „On track" im Team-Sheet · Ist/Soll = Absolute/Relative Working Hours.';
   hw.append(h,hint);head.append(hw);card.append(head);
 
   const tbl=document.createElement('table');tbl.className='agent-tbl';
@@ -1065,10 +1065,9 @@ const agentColors=[C.s1,C.s2,C.s3,C.s5];
   agents.forEach((a,i)=>{
     const r=last[a]||{};
     let st=null;
-    if(r.abs!=null&&r.rel!=null) st=(r.abs>=r.rel-4)?'on':'off';
-    else if(r.ontrack){const t=r.ontrack.toLowerCase();
-      st=t.includes('off')?'off':(t.includes('track')?'on':null);}
-    if(r.abs==null||r.rel==null) missing=true;
+    if(r.ontrack){const t=r.ontrack.toLowerCase();
+      st=t.includes('off')?'off':((t.includes('track')||t==='on')?'on':null);}
+    if(!r.ontrack) missing=true;
 
     const tr=document.createElement('tr');
     const nameTd=document.createElement('td');
@@ -1092,7 +1091,7 @@ const agentColors=[C.s1,C.s2,C.s3,C.s5];
 
   if(missing){
     const note=document.createElement('div');note.className='hint';note.style.marginTop='9px';
-    note.textContent='Hinweis: Ist-/Soll-Arbeitsstunden liegen aktuell nur für Agents mit den Spalten „Relative/Absolute Working Hours" im Team-Sheet vor. Sobald diese auch für die übrigen Agents gepflegt sind, erscheint deren Status automatisch.';
+    note.textContent='Hinweis: Eine „On track"-Spalte liegt aktuell nur für Eli im Team-Sheet vor. Sobald sie auch für die übrigen Agents gepflegt ist, erscheint deren Status automatisch — sag mir Bescheid, wenn die Spalten ergänzt sind, dann verknüpfe ich sie.';
     card.append(note);
   }
   sec.append(card);
