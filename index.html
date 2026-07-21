@@ -102,6 +102,17 @@
     border-radius:8px;padding:9px 12px;font-size:12px;line-height:1.5;
     color:var(--ink-2);margin:0 0 8px;}
   .explain-box.open{display:block;}
+  .agent-tbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px;}
+  .agent-tbl th{color:var(--ink-3);font-weight:500;text-align:right;
+    padding:6px 10px;border-bottom:1px solid var(--grid);}
+  .agent-tbl td{padding:9px 10px;border-bottom:1px solid var(--grid);
+    text-align:right;font-variant-numeric:tabular-nums;}
+  .agent-tbl th:first-child,.agent-tbl td:first-child{text-align:left;}
+  .badge{display:inline-flex;align-items:center;gap:6px;padding:3px 11px;
+    border-radius:999px;font-size:12px;font-weight:600;}
+  .badge.on{background:color-mix(in srgb,var(--st-good) 16%,transparent);color:var(--st-good);}
+  .badge.off{background:color-mix(in srgb,var(--st-crit) 16%,transparent);color:var(--st-crit);}
+  .badge.na{background:color-mix(in srgb,var(--ink-3) 14%,transparent);color:var(--ink-3);}
   .chev-km{color:var(--ink-3);font-size:11px;transition:transform .15s;}
   #kmTitleRow.open .chev-km{transform:rotate(180deg);}
   .tile .split{color:var(--ink-2);font-size:12px;margin-top:4px;}
@@ -193,8 +204,8 @@
 </div>
 
 <script>
-const DATA = {"hubspot": [{"kw": 23, "created": 1021.0, "user": 857.0, "partner": 164.0, "messages": 1463.0, "csat": 0.4, "mtfr": 18.1, "msg_per_ticket": 0.6978810663}, {"kw": 24, "created": 963.0, "user": 841.0, "partner": 122.0, "messages": 1386.0, "csat": 0.55, "mtfr": 12.1, "msg_per_ticket": 0.6948051948}, {"kw": 25, "created": 1008.0, "user": 815.0, "partner": 193.0, "messages": 1338.0, "csat": 0.4, "mtfr": 13.7, "msg_per_ticket": 0.7533632287}, {"kw": 26, "created": 1033.0, "user": 940.0, "partner": 93.0, "messages": 1636.0, "csat": 0.4, "mtfr": 15.8, "msg_per_ticket": 0.6314180929}, {"kw": 27, "created": 1133.0, "user": 903.0, "partner": 230.0, "messages": 2046.0, "csat": 0.4, "mtfr": 15.6, "msg_per_ticket": 0.5537634409}, {"kw": 28, "created": 830.0, "user": 745.0, "partner": 85.0, "messages": 1427.0, "csat": 0.4, "mtfr": 12.9, "msg_per_ticket": 0.5816398038}, {"kw": 29, "created": 849.0, "user": 776.0, "partner": 73.0, "messages": 1129.0, "csat": 0.4, "mtfr": 12.4, "msg_per_ticket": 0.7519929141}], "moinai": [{"kw": 23, "conv_hubspot": 1021.0, "conv_chatbot": 624.0, "conv_total": 1645.0, "share_chatbot": 0.379331307, "takeovers": 230.0, "solved_bot": 394.0, "auto_bot": 0.6314102564, "auto_all": 0.2395136778, "cost_per_ticket": 3.205128205, "savings": 8839.74359}, {"kw": 24, "conv_hubspot": 963.0, "conv_chatbot": 600.0, "conv_total": 1563.0, "share_chatbot": 0.3838771593, "takeovers": 228.0, "solved_bot": 372.0, "auto_bot": 0.62, "auto_all": 0.2380038388, "cost_per_ticket": 3.333333333, "savings": 8680.0}, {"kw": 25, "conv_hubspot": 1008.0, "conv_chatbot": 581.0, "conv_total": 1589.0, "share_chatbot": 0.3656387665, "takeovers": 227.0, "solved_bot": 354.0, "auto_bot": 0.6092943201, "auto_all": 0.2227816237, "cost_per_ticket": 3.442340792, "savings": 8530.120482}, {"kw": 26, "conv_hubspot": 1033.0, "conv_chatbot": 645.0, "conv_total": 1678.0, "share_chatbot": 0.384386174, "takeovers": 247.0, "solved_bot": 398.0, "auto_bot": 0.6170542636, "auto_all": 0.2371871275, "cost_per_ticket": 3.100775194, "savings": 8638.75969}, {"kw": 27, "conv_hubspot": 1133.0, "conv_chatbot": 585.0, "conv_total": 1718.0, "share_chatbot": 0.3405122235, "takeovers": 251.0, "solved_bot": 334.0, "auto_bot": 0.5709401709, "auto_all": 0.1944121071, "cost_per_ticket": 3.418803419, "savings": 7993.162393}, {"kw": 28, "conv_hubspot": 830.0, "conv_chatbot": 485.0, "conv_total": 1315.0, "share_chatbot": 0.3688212928, "takeovers": 165.0, "solved_bot": 320.0, "auto_bot": 0.6597938144, "auto_all": 0.2433460076, "cost_per_ticket": 4.12371134, "savings": 9237.113402}, {"kw": 29, "conv_hubspot": 849.0, "conv_chatbot": 501.0, "conv_total": 1350.0, "share_chatbot": 0.3711111111, "takeovers": 192.0, "solved_bot": 309.0, "auto_bot": 0.6167664671, "auto_all": 0.2288888889, "cost_per_ticket": 3.992015968, "savings": 8634.730539}], "team": [{"kw": 23, "Eli": {"messages": 740.0, "aht": 1.53, "active_hours": 2.0, "note": "12"}, "Jeanine": {"messages": 0.0, "aht": null, "active_hours": 24.0, "note": "On track"}, "Vivien": {"messages": 438.0, "aht": 2.42, "active_hours": 17.666, "note": null}, "Jan": {"messages": 23.0, "aht": 229.0, "active_hours": 2.11, "note": null}}, {"kw": 24, "Eli": {"messages": 800.0, "aht": 1.7, "active_hours": 2.0, "note": "12"}, "Jeanine": {"messages": 0.0, "aht": null, "active_hours": 24.0, "note": "On track"}, "Vivien": {"messages": 0.0, "aht": 0.0, "active_hours": 0.0, "note": null}, "Jan": {"messages": 24.0, "aht": 338.0, "active_hours": 2.28, "note": null}}, {"kw": 25, "Eli": {"messages": 550.0, "aht": 1.93, "active_hours": 2.0, "note": "12"}, "Jeanine": {"messages": 0.0, "aht": null, "active_hours": 24.0, "note": "On track"}, "Vivien": {"messages": 429.0, "aht": 2.37, "active_hours": 16.9455, "note": null}, "Jan": {"messages": 25.0, "aht": 279.0, "active_hours": 2.98, "note": null}}, {"kw": 26, "Eli": {"messages": 700.0, "aht": 1.57, "active_hours": 2.0, "note": "12"}, "Jeanine": {"messages": 0.0, "aht": null, "active_hours": 24.0, "note": "On track"}, "Vivien": {"messages": 531.0, "aht": 2.1, "active_hours": 18.585, "note": null}, "Jan": {"messages": 26.0, "aht": 340.0, "active_hours": 1.74, "note": null}}, {"kw": 27, "Eli": {"messages": 150.0, "aht": 1.82, "active_hours": 2.0, "note": "12"}, "Jeanine": {"messages": 32.0, "aht": null, "active_hours": -8.0, "note": "On track"}, "Vivien": {"messages": 1239.0, "aht": 2.16, "active_hours": 44.604, "note": null}, "Jan": {"messages": 27.0, "aht": 380.0, "active_hours": 2.09, "note": null}}, {"kw": 28, "Eli": {"messages": 370.0, "aht": null, "active_hours": 2.0, "note": "12"}, "Jeanine": {"messages": 18.0, "aht": null, "active_hours": 6.0, "note": "On track"}, "Vivien": {"messages": 523.0, "aht": null, "active_hours": 0.0, "note": null}, "Jan": {"messages": 28.0, "aht": 338.0, "active_hours": null, "note": null}}, {"kw": 29, "Eli": {"messages": 500.0, "aht": null, "active_hours": 2.0, "note": "12"}, "Jeanine": {"messages": null, "aht": null, "active_hours": 24.0, "note": "On track"}, "Vivien": {"messages": 396.0, "aht": null, "active_hours": 0.0, "note": null}, "Jan": {"messages": 28.0, "aht": 220.0, "active_hours": null, "note": null}}], "refunds": [{"kw": 23, "total": 1021.0, "refund_tickets": 392.0, "positive": 36.0, "negative": 356.0, "decline_rate": 0.9081632653, "share": 0.3839373164, "net": 11477.44, "gross": 13656.16}, {"kw": 24, "total": 963.0, "refund_tickets": 450.0, "positive": 41.0, "negative": 409.0, "decline_rate": 0.9088888889, "share": 0.4672897196, "net": 13186.16, "gross": 15689.24}, {"kw": 25, "total": 1008.0, "refund_tickets": 408.0, "positive": 26.0, "negative": 382.0, "decline_rate": 0.9362745098, "share": 0.4047619048, "net": 12315.68, "gross": 14653.52}, {"kw": 26, "total": 1033.0, "refund_tickets": 418.0, "positive": 35.0, "negative": 383.0, "decline_rate": 0.9162679426, "share": 0.4046466602, "net": 12347.92, "gross": 14691.88}, {"kw": 27, "total": 1133.0, "refund_tickets": 464.0, "positive": 38.0, "negative": 426.0, "decline_rate": 0.9181034483, "share": 0.4095322154, "net": 13734.24, "gross": 16341.36}, {"kw": 28, "total": 830.0, "refund_tickets": 305.0, "positive": 31.0, "negative": 274.0, "decline_rate": 0.8983606557, "share": 0.3674698795, "net": 8833.76, "gross": 10510.64}, {"kw": 29, "total": 849.0, "refund_tickets": 250.0, "positive": 17.0, "negative": 233.0, "decline_rate": 0.932, "share": 0.2944640754, "net": 7511.92, "gross": 8937.88}], "costs": [{"month": "Januar", "total_cost": null, "tickets": 7140.0, "cpt": 3.026880112, "tickets_hs": 4767.0, "tickets_cb": 2373.0, "moinai_fee": 2000.0}, {"month": "Februar", "total_cost": null, "tickets": 7086.0, "cpt": 2.595004234, "tickets_hs": 4896.0, "tickets_cb": 2190.0, "moinai_fee": 2000.0}, {"month": "M\u00e4rz", "total_cost": null, "tickets": 9707.0, "cpt": 1.959297414, "tickets_hs": 5727.0, "tickets_cb": 3980.0, "moinai_fee": 2000.0}, {"month": "April", "total_cost": null, "tickets": 7679.0, "cpt": 2.082048444, "tickets_hs": 4467.0, "tickets_cb": 3212.0, "moinai_fee": 2000.0}, {"month": "Mai", "total_cost": null, "tickets": 6566.0, "cpt": 2.392945477, "tickets_hs": 3989.0, "tickets_cb": 2577.0, "moinai_fee": 2000.0}, {"month": "Juni", "total_cost": null, "tickets": 7049.0, "cpt": 2.147046862, "tickets_hs": 4398.0, "tickets_cb": 2651.0, "moinai_fee": 2000.0}], "keymetrics": {"cur": {"month": "Juni", "tickets_hs": 4398.0, "tickets_cb": 2651.0, "tickets_total": 7049.0, "mtfr": 14.925, "csat": 0.4375, "auto_all": 0.23437156695, "savings_rdr": 49327.2, "cpt": 2.147046862, "aht": 8.64173821745217}, "prev": {"month": "Mai", "tickets_hs": 3989.0, "tickets_cb": 2577.0, "tickets_total": 6566.0, "mtfr": null, "csat": null, "auto_all": null, "savings_rdr": null, "cpt": 2.392945477, "aht": null}, "prev_month": "Mai"}};
-const META = {"source": "NeoTaste_CS_Main_KPI_Sheet.xlsx", "updated": "20.07.2026", "public": true};
+const DATA = {"hubspot": [{"kw": 23, "created": 1021.0, "user": 857.0, "partner": 164.0, "messages": 1463.0, "csat": 0.4, "mtfr": 18.1, "msg_per_ticket": 0.6978810663}, {"kw": 24, "created": 963.0, "user": 841.0, "partner": 122.0, "messages": 1386.0, "csat": 0.55, "mtfr": 12.1, "msg_per_ticket": 0.6948051948}, {"kw": 25, "created": 1008.0, "user": 815.0, "partner": 193.0, "messages": 1338.0, "csat": 0.4, "mtfr": 13.7, "msg_per_ticket": 0.7533632287}, {"kw": 26, "created": 1033.0, "user": 940.0, "partner": 93.0, "messages": 1636.0, "csat": 0.4, "mtfr": 15.8, "msg_per_ticket": 0.6314180929}, {"kw": 27, "created": 1133.0, "user": 903.0, "partner": 230.0, "messages": 2046.0, "csat": 0.4, "mtfr": 15.6, "msg_per_ticket": 0.5537634409}, {"kw": 28, "created": 830.0, "user": 745.0, "partner": 85.0, "messages": 1427.0, "csat": 0.4, "mtfr": 12.9, "msg_per_ticket": 0.5816398038}, {"kw": 29, "created": 849.0, "user": 776.0, "partner": 73.0, "messages": 1129.0, "csat": 0.4, "mtfr": 12.4, "msg_per_ticket": 0.7519929141}], "moinai": [{"kw": 23, "conv_hubspot": 1021.0, "conv_chatbot": 624.0, "conv_total": 1645.0, "share_chatbot": 0.379331307, "takeovers": 230.0, "solved_bot": 394.0, "auto_bot": 0.6314102564, "auto_all": 0.2395136778, "cost_per_ticket": 3.205128205, "savings": 8839.74359}, {"kw": 24, "conv_hubspot": 963.0, "conv_chatbot": 600.0, "conv_total": 1563.0, "share_chatbot": 0.3838771593, "takeovers": 228.0, "solved_bot": 372.0, "auto_bot": 0.62, "auto_all": 0.2380038388, "cost_per_ticket": 3.333333333, "savings": 8680.0}, {"kw": 25, "conv_hubspot": 1008.0, "conv_chatbot": 581.0, "conv_total": 1589.0, "share_chatbot": 0.3656387665, "takeovers": 227.0, "solved_bot": 354.0, "auto_bot": 0.6092943201, "auto_all": 0.2227816237, "cost_per_ticket": 3.442340792, "savings": 8530.120482}, {"kw": 26, "conv_hubspot": 1033.0, "conv_chatbot": 645.0, "conv_total": 1678.0, "share_chatbot": 0.384386174, "takeovers": 247.0, "solved_bot": 398.0, "auto_bot": 0.6170542636, "auto_all": 0.2371871275, "cost_per_ticket": 3.100775194, "savings": 8638.75969}, {"kw": 27, "conv_hubspot": 1133.0, "conv_chatbot": 585.0, "conv_total": 1718.0, "share_chatbot": 0.3405122235, "takeovers": 251.0, "solved_bot": 334.0, "auto_bot": 0.5709401709, "auto_all": 0.1944121071, "cost_per_ticket": 3.418803419, "savings": 7993.162393}, {"kw": 28, "conv_hubspot": 830.0, "conv_chatbot": 485.0, "conv_total": 1315.0, "share_chatbot": 0.3688212928, "takeovers": 165.0, "solved_bot": 320.0, "auto_bot": 0.6597938144, "auto_all": 0.2433460076, "cost_per_ticket": 4.12371134, "savings": 9237.113402}, {"kw": 29, "conv_hubspot": 849.0, "conv_chatbot": 501.0, "conv_total": 1350.0, "share_chatbot": 0.3711111111, "takeovers": 192.0, "solved_bot": 309.0, "auto_bot": 0.6167664671, "auto_all": 0.2288888889, "cost_per_ticket": 3.992015968, "savings": 8634.730539}], "team": [{"kw": 23, "Eli": {"messages": 740.0, "aht": 1.53, "active_hours": 24.66666667, "note": null, "rel": 24.0, "abs": 24.66666667, "ontrack": "On track"}, "Jeanine": {"messages": 438.0, "aht": 2.42, "active_hours": 17.666, "note": null, "rel": null, "abs": null, "ontrack": null}, "Vivien": {"messages": 229.0, "aht": 2.11, "active_hours": null, "note": null, "rel": null, "abs": null, "ontrack": null}, "Jan": {"messages": 56.0, "aht": 2.51, "active_hours": null, "note": null, "rel": null, "abs": null, "ontrack": null}}, {"kw": 24, "Eli": {"messages": 800.0, "aht": 1.7, "active_hours": 26.66666667, "note": null, "rel": 24.0, "abs": 26.66666667, "ontrack": "On track"}, "Jeanine": {"messages": 0.0, "aht": 0.0, "active_hours": 0.0, "note": "Holiday", "rel": null, "abs": null, "ontrack": null}, "Vivien": {"messages": 338.0, "aht": 2.28, "active_hours": null, "note": null, "rel": null, "abs": null, "ontrack": null}, "Jan": {"messages": 248.0, "aht": 2.0, "active_hours": null, "note": null, "rel": null, "abs": null, "ontrack": null}}, {"kw": 25, "Eli": {"messages": 550.0, "aht": 1.93, "active_hours": 18.33333333, "note": null, "rel": 24.0, "abs": 18.33333333, "ontrack": "On track"}, "Jeanine": {"messages": 429.0, "aht": 2.37, "active_hours": 16.9455, "note": null, "rel": null, "abs": null, "ontrack": null}, "Vivien": {"messages": 279.0, "aht": 2.98, "active_hours": null, "note": null, "rel": null, "abs": null, "ontrack": null}, "Jan": {"messages": 80.0, "aht": 3.07, "active_hours": null, "note": null, "rel": null, "abs": null, "ontrack": null}}, {"kw": 26, "Eli": {"messages": 700.0, "aht": 1.57, "active_hours": 23.33333333, "note": null, "rel": 24.0, "abs": 23.33333333, "ontrack": "On track"}, "Jeanine": {"messages": 531.0, "aht": 2.1, "active_hours": 18.585, "note": null, "rel": null, "abs": null, "ontrack": null}, "Vivien": {"messages": 340.0, "aht": 1.74, "active_hours": null, "note": null, "rel": null, "abs": null, "ontrack": null}, "Jan": {"messages": 65.0, "aht": 1.94, "active_hours": null, "note": null, "rel": null, "abs": null, "ontrack": null}}, {"kw": 27, "Eli": {"messages": 150.0, "aht": 1.82, "active_hours": 5.0, "note": "Holiday", "rel": -8.0, "abs": 5.0, "ontrack": "On track"}, "Jeanine": {"messages": 1239.0, "aht": 2.16, "active_hours": 44.604, "note": null, "rel": null, "abs": null, "ontrack": null}, "Vivien": {"messages": 380.0, "aht": 2.09, "active_hours": null, "note": null, "rel": null, "abs": null, "ontrack": null}, "Jan": {"messages": 277.0, "aht": 2.13, "active_hours": null, "note": null, "rel": null, "abs": null, "ontrack": null}}, {"kw": 28, "Eli": {"messages": 370.0, "aht": null, "active_hours": 12.33333333, "note": "Holiday", "rel": 6.0, "abs": 12.33333333, "ontrack": "On track"}, "Jeanine": {"messages": 523.0, "aht": null, "active_hours": 0.0, "note": null, "rel": null, "abs": null, "ontrack": null}, "Vivien": {"messages": 338.0, "aht": null, "active_hours": null, "note": null, "rel": null, "abs": null, "ontrack": null}, "Jan": {"messages": 196.0, "aht": null, "active_hours": null, "note": null, "rel": null, "abs": null, "ontrack": null}}, {"kw": 29, "Eli": {"messages": 500.0, "aht": null, "active_hours": 16.66666667, "note": null, "rel": 24.0, "abs": 16.66666667, "ontrack": "On track"}, "Jeanine": {"messages": 396.0, "aht": null, "active_hours": 0.0, "note": null, "rel": null, "abs": null, "ontrack": null}, "Vivien": {"messages": 220.0, "aht": null, "active_hours": null, "note": "University", "rel": null, "abs": null, "ontrack": null}, "Jan": {"messages": 13.0, "aht": null, "active_hours": null, "note": null, "rel": null, "abs": null, "ontrack": null}}], "refunds": [{"kw": 23, "total": 1021.0, "refund_tickets": 392.0, "positive": 36.0, "negative": 356.0, "decline_rate": 0.9081632653, "share": 0.3839373164, "net": 11477.44, "gross": 13656.16}, {"kw": 24, "total": 963.0, "refund_tickets": 450.0, "positive": 41.0, "negative": 409.0, "decline_rate": 0.9088888889, "share": 0.4672897196, "net": 13186.16, "gross": 15689.24}, {"kw": 25, "total": 1008.0, "refund_tickets": 408.0, "positive": 26.0, "negative": 382.0, "decline_rate": 0.9362745098, "share": 0.4047619048, "net": 12315.68, "gross": 14653.52}, {"kw": 26, "total": 1033.0, "refund_tickets": 418.0, "positive": 35.0, "negative": 383.0, "decline_rate": 0.9162679426, "share": 0.4046466602, "net": 12347.92, "gross": 14691.88}, {"kw": 27, "total": 1133.0, "refund_tickets": 464.0, "positive": 38.0, "negative": 426.0, "decline_rate": 0.9181034483, "share": 0.4095322154, "net": 13734.24, "gross": 16341.36}, {"kw": 28, "total": 830.0, "refund_tickets": 305.0, "positive": 31.0, "negative": 274.0, "decline_rate": 0.8983606557, "share": 0.3674698795, "net": 8833.76, "gross": 10510.64}, {"kw": 29, "total": 849.0, "refund_tickets": 250.0, "positive": 17.0, "negative": 233.0, "decline_rate": 0.932, "share": 0.2944640754, "net": 7511.92, "gross": 8937.88}], "costs": [{"month": "Januar", "total_cost": null, "tickets": 7140.0, "cpt": 3.026880112, "tickets_hs": 4767.0, "tickets_cb": 2373.0, "moinai_fee": 2000.0}, {"month": "Februar", "total_cost": null, "tickets": 7086.0, "cpt": 2.595004234, "tickets_hs": 4896.0, "tickets_cb": 2190.0, "moinai_fee": 2000.0}, {"month": "M\u00e4rz", "total_cost": null, "tickets": 9707.0, "cpt": 1.959297414, "tickets_hs": 5727.0, "tickets_cb": 3980.0, "moinai_fee": 2000.0}, {"month": "April", "total_cost": null, "tickets": 7679.0, "cpt": 2.082048444, "tickets_hs": 4467.0, "tickets_cb": 3212.0, "moinai_fee": 2000.0}, {"month": "Mai", "total_cost": null, "tickets": 6566.0, "cpt": 2.392945477, "tickets_hs": 3989.0, "tickets_cb": 2577.0, "moinai_fee": 2000.0}, {"month": "Juni", "total_cost": null, "tickets": 7049.0, "cpt": 2.147046862, "tickets_hs": 4398.0, "tickets_cb": 2651.0, "moinai_fee": 2000.0}], "keymetrics": {"cur": {"month": "Juni", "tickets_hs": 4398.0, "tickets_cb": 2651.0, "tickets_total": 7049.0, "mtfr": 14.925, "csat": 0.4375, "auto_all": 0.23437156695, "savings_rdr": 49327.2, "cpt": 2.147046862, "aht": 1.9800103039670276}, "prev": {"month": "Mai", "tickets_hs": 3989.0, "tickets_cb": 2577.0, "tickets_total": 6566.0, "mtfr": null, "csat": null, "auto_all": null, "savings_rdr": null, "cpt": 2.392945477, "aht": null}, "prev_month": "Mai"}};
+const META = {"source": "NeoTaste_CS_Main_KPI_Sheet.xlsx", "updated": "21.07.2026", "public": true};
 
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const fmtN = v => v==null?'–':Math.round(v).toLocaleString('de-DE');
@@ -658,13 +669,20 @@ function buildLiveData(hsT,maT,tmT,rfT){
   const ma=dataRows(parseCSV(maT)).map(r=>({kw:Math.round(n(r[0])),conv_hubspot:n(r[1]),
     conv_chatbot:n(r[2]),conv_total:n(r[3]),share_chatbot:n(r[4]),takeovers:n(r[5]),
     solved_bot:n(r[6]),auto_bot:n(r[7]),auto_all:n(r[8]),savings:n(r[10])}));
-  const AG={Eli:[0,1,2,3,5],Jeanine:[6,7,8,9,11],Vivien:[12,13,14,15,16],Jan:[17,18,19,20,21]};
+  const AG={
+    Eli:{msg:1,aht:2,act:10,note:8,rel:9,abs:10,ontrack:11},
+    Jeanine:{msg:13,aht:14,act:15,note:17},
+    Vivien:{msg:19,aht:20,act:21,note:22},
+    Jan:{msg:24,aht:25,act:26,note:27}};
+  const txt=v=>{v=(v||'').trim();return (v===''||v==='/')?null:v;};
   const tm=dataRows(parseCSV(tmT)).map(r=>{
     const o={kw:Math.round(n(r[0]))};
-    for(const[a,[,mc,ac,hc,nc]]of Object.entries(AG)){
-      let note=(r[nc]||'').trim();
-      if(note==='/'||note==='')note=null;
-      o[a]={messages:n(r[mc]),aht:n(r[ac]),active_hours:n(r[hc]),note:note};
+    for(const[a,m]of Object.entries(AG)){
+      o[a]={messages:n(r[m.msg]),aht:n(r[m.aht]),active_hours:n(r[m.act]),
+            note:txt(r[m.note]),
+            rel:m.rel!=null?n(r[m.rel]):null,
+            abs:m.abs!=null?n(r[m.abs]):null,
+            ontrack:m.ontrack!=null?txt(r[m.ontrack]):null};
     }
     return o;});
   const rf=dataRows(parseCSV(rfT)).map(r=>({kw:Math.round(n(r[0])),total:n(r[1]),
@@ -1023,6 +1041,63 @@ if(!META.public){
 /* Team */
 const agents=['Eli','Jeanine','Vivien','Jan'];
 const agentColors=[C.s1,C.s2,C.s3,C.s5];
+
+/* Agent-Status: On Track wenn absolute Arbeitsstunden ≥ relative − 4 h Kulanz */
+(function(){
+  const sec=document.getElementById('sec-team');
+  const last=D.team[D.team.length-1]||{};
+  const card=document.createElement('div');card.className='card w12';
+  const head=document.createElement('div');head.className='card-head';
+  const hw=document.createElement('div');
+  const h=document.createElement('h3');
+  h.textContent='Agent-Status — KW '+(last.kw!=null?last.kw:'–');
+  const hint=document.createElement('div');hint.className='hint';
+  hint.textContent='On Track, wenn die geleisteten (Ist-)Arbeitsstunden die geplanten (Soll-)Stunden erreichen — mit 4 h Kulanz.';
+  hw.append(h,hint);head.append(hw);card.append(head);
+
+  const tbl=document.createElement('table');tbl.className='agent-tbl';
+  const hr=document.createElement('tr');
+  ['Agent','Status','Messages','Ø AHT','Ist-Std.','Soll-Std.'].forEach(t=>{
+    const th=document.createElement('th');th.textContent=t;hr.append(th);});
+  tbl.append(hr);
+
+  let missing=false;
+  agents.forEach((a,i)=>{
+    const r=last[a]||{};
+    let st=null;
+    if(r.abs!=null&&r.rel!=null) st=(r.abs>=r.rel-4)?'on':'off';
+    else if(r.ontrack){const t=r.ontrack.toLowerCase();
+      st=t.includes('off')?'off':(t.includes('track')?'on':null);}
+    if(r.abs==null||r.rel==null) missing=true;
+
+    const tr=document.createElement('tr');
+    const nameTd=document.createElement('td');
+    const dot=document.createElement('span');dot.className='stdot';dot.style.background=agentColors[i];
+    nameTd.append(dot,document.createTextNode(a+(r.note?' · '+r.note:'')));tr.append(nameTd);
+
+    const stTd=document.createElement('td');
+    const badge=document.createElement('span');badge.className='badge '+(st||'na');
+    badge.textContent=st==='on'?'✓ On Track':(st==='off'?'✗ Off Track':'–');
+    stTd.append(badge);tr.append(stTd);
+
+    const td=(txt)=>{const d=document.createElement('td');d.textContent=txt;return d;};
+    const hh=v=>v!=null?v.toLocaleString('de-DE',{maximumFractionDigits:1})+' h':'–';
+    tr.append(td(r.messages!=null?fmtN(r.messages):'–'));
+    tr.append(td(r.aht!=null?fmtMin(r.aht):'–'));
+    tr.append(td(hh(r.abs)));
+    tr.append(td(hh(r.rel)));
+    tbl.append(tr);
+  });
+  card.append(tbl);
+
+  if(missing){
+    const note=document.createElement('div');note.className='hint';note.style.marginTop='9px';
+    note.textContent='Hinweis: Ist-/Soll-Arbeitsstunden liegen aktuell nur für Agents mit den Spalten „Relative/Absolute Working Hours" im Team-Sheet vor. Sobald diese auch für die übrigen Agents gepflegt sind, erscheint deren Status automatisch.';
+    card.append(note);
+  }
+  sec.append(card);
+})();
+
 const notesTxt=(function(){
   const parts=[];
   tm.forEach(r=>agents.forEach(a=>{

@@ -55,17 +55,36 @@ def extract(path):
         'cost_per_ticket': num(r[9]), 'savings': num(r[10]),
     } for r in ma]
 
-    tp = rows('👥 Team_Performance', maxcol=22)
-    agents = {'Eli': (0, 1, 2, 3, 5), 'Jeanine': (6, 7, 8, 9, 11),
-              'Vivien': (12, 13, 14, 15, 16), 'Jan': (17, 18, 19, 20, 21)}
+    tp = rows('👥 Team_Performance', maxcol=29)
+    # Struktur (0-indexiert): Eli-Block ist erweitert (Contract/Projekt/Meeting/
+    # Hours Off, Relative/Absolute Working Hours, On-track-Spalte).
+    agents = {
+        'Eli':     {'msg': 1,  'aht': 2,  'act': 10, 'note': 8,  'rel': 9,  'abs': 10, 'ontrack': 11},
+        'Jeanine': {'msg': 13, 'aht': 14, 'act': 15, 'note': 17},
+        'Vivien':  {'msg': 19, 'aht': 20, 'act': 21, 'note': 22},
+        'Jan':     {'msg': 24, 'aht': 25, 'act': 26, 'note': 27},
+    }
     d['team'] = []
     for r in tp:
+        if num(r[0]) is None:
+            continue
+
+        def cell(i):
+            return num(r[i]) if (i is not None and i < len(r)) else None
+
+        def text(i):
+            v = r[i] if (i is not None and i < len(r)) else None
+            v = str(v).strip() if v not in (None, '', '/') else None
+            return v
+
         row = {'kw': int(r[0])}
-        for name, (kwc, msgc, ahtc, actc, notec) in agents.items():
-            note = r[notec] if notec < len(r) else None
-            note = str(note).strip() if note not in (None, '/', '') else None
-            row[name] = {'messages': num(r[msgc]), 'aht': num(r[ahtc]),
-                         'active_hours': num(r[actc]), 'note': note}
+        for name, m in agents.items():
+            row[name] = {
+                'messages': cell(m.get('msg')), 'aht': cell(m.get('aht')),
+                'active_hours': cell(m.get('act')), 'note': text(m.get('note')),
+                'rel': cell(m.get('rel')), 'abs': cell(m.get('abs')),
+                'ontrack': text(m.get('ontrack')),
+            }
         d['team'].append(row)
 
     rf = rows('💸 Refund_Tracking', maxcol=9)
@@ -300,6 +319,17 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     border-radius:8px;padding:9px 12px;font-size:12px;line-height:1.5;
     color:var(--ink-2);margin:0 0 8px;}
   .explain-box.open{display:block;}
+  .agent-tbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px;}
+  .agent-tbl th{color:var(--ink-3);font-weight:500;text-align:right;
+    padding:6px 10px;border-bottom:1px solid var(--grid);}
+  .agent-tbl td{padding:9px 10px;border-bottom:1px solid var(--grid);
+    text-align:right;font-variant-numeric:tabular-nums;}
+  .agent-tbl th:first-child,.agent-tbl td:first-child{text-align:left;}
+  .badge{display:inline-flex;align-items:center;gap:6px;padding:3px 11px;
+    border-radius:999px;font-size:12px;font-weight:600;}
+  .badge.on{background:color-mix(in srgb,var(--st-good) 16%,transparent);color:var(--st-good);}
+  .badge.off{background:color-mix(in srgb,var(--st-crit) 16%,transparent);color:var(--st-crit);}
+  .badge.na{background:color-mix(in srgb,var(--ink-3) 14%,transparent);color:var(--ink-3);}
   .chev-km{color:var(--ink-3);font-size:11px;transition:transform .15s;}
   #kmTitleRow.open .chev-km{transform:rotate(180deg);}
   .tile .split{color:var(--ink-2);font-size:12px;margin-top:4px;}
@@ -856,13 +886,20 @@ function buildLiveData(hsT,maT,tmT,rfT){
   const ma=dataRows(parseCSV(maT)).map(r=>({kw:Math.round(n(r[0])),conv_hubspot:n(r[1]),
     conv_chatbot:n(r[2]),conv_total:n(r[3]),share_chatbot:n(r[4]),takeovers:n(r[5]),
     solved_bot:n(r[6]),auto_bot:n(r[7]),auto_all:n(r[8]),savings:n(r[10])}));
-  const AG={Eli:[0,1,2,3,5],Jeanine:[6,7,8,9,11],Vivien:[12,13,14,15,16],Jan:[17,18,19,20,21]};
+  const AG={
+    Eli:{msg:1,aht:2,act:10,note:8,rel:9,abs:10,ontrack:11},
+    Jeanine:{msg:13,aht:14,act:15,note:17},
+    Vivien:{msg:19,aht:20,act:21,note:22},
+    Jan:{msg:24,aht:25,act:26,note:27}};
+  const txt=v=>{v=(v||'').trim();return (v===''||v==='/')?null:v;};
   const tm=dataRows(parseCSV(tmT)).map(r=>{
     const o={kw:Math.round(n(r[0]))};
-    for(const[a,[,mc,ac,hc,nc]]of Object.entries(AG)){
-      let note=(r[nc]||'').trim();
-      if(note==='/'||note==='')note=null;
-      o[a]={messages:n(r[mc]),aht:n(r[ac]),active_hours:n(r[hc]),note:note};
+    for(const[a,m]of Object.entries(AG)){
+      o[a]={messages:n(r[m.msg]),aht:n(r[m.aht]),active_hours:n(r[m.act]),
+            note:txt(r[m.note]),
+            rel:m.rel!=null?n(r[m.rel]):null,
+            abs:m.abs!=null?n(r[m.abs]):null,
+            ontrack:m.ontrack!=null?txt(r[m.ontrack]):null};
     }
     return o;});
   const rf=dataRows(parseCSV(rfT)).map(r=>({kw:Math.round(n(r[0])),total:n(r[1]),
@@ -1221,6 +1258,63 @@ if(!META.public){
 /* Team */
 const agents=['Eli','Jeanine','Vivien','Jan'];
 const agentColors=[C.s1,C.s2,C.s3,C.s5];
+
+/* Agent-Status: On Track wenn absolute Arbeitsstunden ≥ relative − 4 h Kulanz */
+(function(){
+  const sec=document.getElementById('sec-team');
+  const last=D.team[D.team.length-1]||{};
+  const card=document.createElement('div');card.className='card w12';
+  const head=document.createElement('div');head.className='card-head';
+  const hw=document.createElement('div');
+  const h=document.createElement('h3');
+  h.textContent='Agent-Status — KW '+(last.kw!=null?last.kw:'–');
+  const hint=document.createElement('div');hint.className='hint';
+  hint.textContent='On Track, wenn die geleisteten (Ist-)Arbeitsstunden die geplanten (Soll-)Stunden erreichen — mit 4 h Kulanz.';
+  hw.append(h,hint);head.append(hw);card.append(head);
+
+  const tbl=document.createElement('table');tbl.className='agent-tbl';
+  const hr=document.createElement('tr');
+  ['Agent','Status','Messages','Ø AHT','Ist-Std.','Soll-Std.'].forEach(t=>{
+    const th=document.createElement('th');th.textContent=t;hr.append(th);});
+  tbl.append(hr);
+
+  let missing=false;
+  agents.forEach((a,i)=>{
+    const r=last[a]||{};
+    let st=null;
+    if(r.abs!=null&&r.rel!=null) st=(r.abs>=r.rel-4)?'on':'off';
+    else if(r.ontrack){const t=r.ontrack.toLowerCase();
+      st=t.includes('off')?'off':(t.includes('track')?'on':null);}
+    if(r.abs==null||r.rel==null) missing=true;
+
+    const tr=document.createElement('tr');
+    const nameTd=document.createElement('td');
+    const dot=document.createElement('span');dot.className='stdot';dot.style.background=agentColors[i];
+    nameTd.append(dot,document.createTextNode(a+(r.note?' · '+r.note:'')));tr.append(nameTd);
+
+    const stTd=document.createElement('td');
+    const badge=document.createElement('span');badge.className='badge '+(st||'na');
+    badge.textContent=st==='on'?'✓ On Track':(st==='off'?'✗ Off Track':'–');
+    stTd.append(badge);tr.append(stTd);
+
+    const td=(txt)=>{const d=document.createElement('td');d.textContent=txt;return d;};
+    const hh=v=>v!=null?v.toLocaleString('de-DE',{maximumFractionDigits:1})+' h':'–';
+    tr.append(td(r.messages!=null?fmtN(r.messages):'–'));
+    tr.append(td(r.aht!=null?fmtMin(r.aht):'–'));
+    tr.append(td(hh(r.abs)));
+    tr.append(td(hh(r.rel)));
+    tbl.append(tr);
+  });
+  card.append(tbl);
+
+  if(missing){
+    const note=document.createElement('div');note.className='hint';note.style.marginTop='9px';
+    note.textContent='Hinweis: Ist-/Soll-Arbeitsstunden liegen aktuell nur für Agents mit den Spalten „Relative/Absolute Working Hours" im Team-Sheet vor. Sobald diese auch für die übrigen Agents gepflegt sind, erscheint deren Status automatisch.';
+    card.append(note);
+  }
+  sec.append(card);
+})();
+
 const notesTxt=(function(){
   const parts=[];
   tm.forEach(r=>agents.forEach(a=>{
