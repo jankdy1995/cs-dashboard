@@ -83,6 +83,9 @@
   .insights.open .body{display:block;}
   .insights .count{background:var(--st-warn);color:#fff;border-radius:9px;
     font-size:11px;font-weight:650;padding:1px 8px;}
+  .insights .count.good{background:var(--st-good);}
+  .insights-row{display:flex;gap:14px;margin-top:18px;flex-wrap:wrap;}
+  .insights-row .insights{flex:1 1 340px;margin-top:0;min-width:0;}
   .insights .row{display:flex;gap:9px;align-items:baseline;
     font-size:13px;margin:5px 0;color:var(--ink-2);}
   .insights .dot{flex:none;width:9px;height:9px;border-radius:50%;
@@ -177,7 +180,10 @@
     </div>
   </header>
 
-  <div class="insights" id="insights" style="display:none"></div>
+  <div class="insights-row">
+    <div class="insights" id="insights" style="display:none"></div>
+    <div class="insights" id="wins" style="display:none"></div>
+  </div>
 
   <div class="section-title" style="--acc:var(--s3);cursor:pointer;user-select:none" id="kmTitleRow">⭐ Key Metrics — <span id="km-title"></span><span class="rule"></span><span class="chev-km" id="kmChev">▼</span></div>
   <div class="tiles km" id="kmtiles" style="display:none"></div>
@@ -812,71 +818,80 @@ document.getElementById('subline').textContent=
 document.getElementById('footline').textContent=
   `Quelle: NeoTaste CS KPI-Liste (Google Sheets) · ${standTxt} · Zeitraum: KW ${D.hubspot[0].kw}–${cur.kw}`;
 
-/* Aufmerksamkeit: automatische Abweichungs-Hinweise */
+/* Aufmerksamkeit (negativ) + Erfolge (positiv) — zwei aufklappbare Boxen */
 (function(){
-  const box=document.getElementById('insights');
-  const items=[];
   const RW=D.hubspot,RM=D.moinai,RR=D.refunds;
   const lastOf=a=>a[a.length-1],prevOf=a=>a[a.length-2];
-  function streak(rows,f,key){
+  const kw=lastOf(RW)?lastOf(RW).kw:'–';
+  const goal=key=>TARGETS[key].goal.replace('Ziel ','Ziel: ');
+  function streak(rows,f,key,mode){
     let n=0;
     for(let i=rows.length-1;i>=0;i--){
       const st=statusOf(key,rows[i][f]);
-      if(st==='warn'||st==='crit')n++;else break;
+      const hit=mode==='good'?(st==='good'):(st==='warn'||st==='crit');
+      if(hit)n++;else break;
     }
     return n;
   }
-  const streaks=[
+  const attn=[], wins=[];
+  const STREAKS=[
     [RW,'csat','csat','CSAT',v=>fmtP(v)],
     [RW,'mtfr','mtfr','Median First Reply Time',v=>fmtH(v)],
     [RM,'auto_all','auto_all','Automation Rate',v=>fmtP(v)],
     [RR,'decline_rate','decline_rate','Refund Decline Rate',v=>fmtP(v)],
   ];
-  streaks.forEach(([rows,f,key,name,fmt])=>{
-    const n=streak(rows,f,key);
+  STREAKS.forEach(([rows,f,key,name,fmt])=>{
     const cv=lastOf(rows)[f];
-    if(n>=2)items.push({sev:3,st:statusOf(key,cv),
-      txt:name+' verfehlt das Ziel seit '+n+' Wochen (aktuell '+fmt(cv)+' · '+TARGETS[key].goal.replace('Ziel ','Ziel: ')+').'});
-    else if(n===1)items.push({sev:1,st:statusOf(key,cv),
-      txt:name+' liegt diese Woche unter Ziel ('+fmt(cv)+' · '+TARGETS[key].goal.replace('Ziel ','Ziel: ')+').'});
+    const bad=streak(rows,f,key,'bad'), good=streak(rows,f,key,'good');
+    if(bad>=2)attn.push({sev:3,st:statusOf(key,cv),
+      txt:name+' verfehlt das Ziel seit '+bad+' Wochen (aktuell '+fmt(cv)+' · '+goal(key)+').'});
+    else if(bad===1)attn.push({sev:1,st:statusOf(key,cv),
+      txt:name+' liegt diese Woche unter Ziel ('+fmt(cv)+' · '+goal(key)+').'});
+    if(good>=2)wins.push({sev:3,st:'good',
+      txt:name+' erreicht das Ziel seit '+good+' Wochen (aktuell '+fmt(cv)+' · '+goal(key)+').'});
+    else if(good===1)wins.push({sev:1,st:'good',
+      txt:name+' liegt diese Woche im Ziel ('+fmt(cv)+' · '+goal(key)+').'});
   });
-  const moves=[
+  const MOVES=[
     [RW,'created','Erstellte Tickets','down',fmtN],
     [RW,'mtfr','Median First Reply Time','down',fmtH],
     [RM,'auto_all','Automation Rate','up',fmtP],
     [RM,'savings','Weekly Savings','up',fmtEuro],
     [RR,'net','Net Contribution','up',fmtEuro],
   ];
-  moves.forEach(([rows,f,name,goodDir,fmt])=>{
+  MOVES.forEach(([rows,f,name,goodDir,fmt])=>{
     const c=lastOf(rows),pv=prevOf(rows);
     if(!c||!pv||c[f]==null||!pv[f])return;
     const d=(c[f]-pv[f])/pv[f];
     if(Math.abs(d)<0.10)return;
     const good=(d>=0)===(goodDir==='up');
-    items.push({sev:2,st:good?'good':'warn',
-      txt:name+' '+(d>=0?'+':'−')+(Math.abs(d)*100).toLocaleString('de-DE',{maximumFractionDigits:0})+' % vs. Vorwoche ('+fmt(c[f])+').'});
+    const txt=name+' '+(d>=0?'+':'−')+(Math.abs(d)*100).toLocaleString('de-DE',{maximumFractionDigits:0})+' % vs. Vorwoche ('+fmt(c[f])+').';
+    (good?wins:attn).push({sev:2,st:good?'good':'warn',txt:txt});
   });
   const created=RW.map(r=>r.created).filter(v=>v!=null);
   if(created.length>=3&&lastOf(RW).created===Math.max(...created))
-    items.push({sev:1,st:'warn',txt:'Erstellte Tickets erreichen mit '+fmtN(lastOf(RW).created)+' den höchsten Wochenwert seit Beginn der Aufzeichnung.'});
-  items.sort((a,b)=>b.sev-a.sev);
-  const top=items.slice(0,5);
-  box.replaceChildren();
-  if(!top.length){box.style.display='none';}
-  else{
+    attn.push({sev:1,st:'warn',txt:'Erstellte Tickets erreichen mit '+fmtN(lastOf(RW).created)+' den höchsten Wochenwert seit Beginn der Aufzeichnung.'});
+  const sav=RM.map(r=>r.savings).filter(v=>v!=null);
+  if(sav.length>=3&&lastOf(RM).savings===Math.max(...sav))
+    wins.push({sev:2,st:'good',txt:'Weekly Savings erreichen mit '+fmtEuro(lastOf(RM).savings)+' den höchsten Wert seit Beginn der Aufzeichnung.'});
+
+  function renderBox(id,emoji,heading,items,stateKey,goodBadge){
+    const box=document.getElementById(id);
+    box.replaceChildren();
+    items.sort((a,b)=>b.sev-a.sev);
+    const top=items.slice(0,5);
+    if(!top.length){box.style.display='none';return;}
     box.style.display='';
-    box.classList.toggle('open',window.__insightsOpen===true);
+    box.classList.toggle('open',window[stateKey]===true);
     const h=document.createElement('h2');
     const title=document.createElement('span');
-    title.textContent='🔎 Aufmerksamkeit — KW '+lastOf(RW).kw;
-    const cnt=document.createElement('span');cnt.className='count';
-    cnt.textContent=top.length+(top.length===1?' Hinweis':' Hinweise');
+    title.textContent=emoji+' '+heading+' — KW '+kw;
+    const cnt=document.createElement('span');cnt.className='count'+(goodBadge?' good':'');
+    cnt.textContent=top.length+(top.length===1?' Punkt':' Punkte');
     const chev=document.createElement('span');chev.className='chev';chev.textContent='▼';
     h.append(title,cnt,chev);
-    h.addEventListener('click',()=>{
-      window.__insightsOpen=!box.classList.contains('open');
-      box.classList.toggle('open');
-    });
+    h.addEventListener('click',()=>{window[stateKey]=!box.classList.contains('open');
+      box.classList.toggle('open');});
     const body=document.createElement('div');body.className='body';
     top.forEach(it=>{
       const row=document.createElement('div');row.className='row';
@@ -887,6 +902,8 @@ document.getElementById('footline').textContent=
     });
     box.append(h,body);
   }
+  renderBox('insights','🔎','Aufmerksamkeit',attn,'__attnOpen',false);
+  renderBox('wins','✅','Positives',wins,'__winsOpen',true);
 })();
 
 /* Key Metrics (Monatssicht) */
