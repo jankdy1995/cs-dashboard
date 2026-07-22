@@ -116,8 +116,10 @@
   .badge.on{background:color-mix(in srgb,var(--st-good) 16%,transparent);color:var(--st-good);}
   .badge.off{background:color-mix(in srgb,var(--st-crit) 16%,transparent);color:var(--st-crit);}
   .badge.na{background:color-mix(in srgb,var(--ink-3) 14%,transparent);color:var(--ink-3);}
-  .chev-km{color:var(--ink-3);font-size:11px;transition:transform .15s;}
-  #kmTitleRow.open .chev-km{transform:rotate(180deg);}
+  .section-title{cursor:pointer;user-select:none;}
+  .section-title .sec-chev{flex:none;color:var(--ink-3);font-size:11px;
+    margin-left:4px;transition:transform .15s;}
+  .section-title.collapsed .sec-chev{transform:rotate(-90deg);}
   .tile .split{color:var(--ink-2);font-size:12px;margin-top:4px;}
   .km .tile .value{font-size:30px;}
   .km .tile{padding:16px 18px;}
@@ -185,7 +187,7 @@
     <div class="insights" id="wins" style="display:none"></div>
   </div>
 
-  <div class="section-title" style="--acc:var(--s3);cursor:pointer;user-select:none" id="kmTitleRow">⭐ Key Metrics — <span id="km-title"></span><span class="rule"></span><span class="chev-km" id="kmChev">▼</span></div>
+  <div class="section-title" style="--acc:var(--s3)" id="kmTitleRow">⭐ Key Metrics — <span id="km-title"></span><span class="rule"></span></div>
   <div class="tiles km" id="kmtiles" style="display:none"></div>
 
   <div class="section-title" style="--acc:var(--s1)">📆 Letzte Woche — <span id="week-title"></span><span class="rule"></span></div>
@@ -939,8 +941,7 @@ if(KM&&KM.cur){
      delta:rel(k.aht,p.aht),goodWhen:'down',deltaLabel:vsLbl,
      sub:'Ø gewichtet über alle Agents',statusKey:'aht',statusVal:k.aht});
 }
-document.getElementById('kmtiles').style.display=window.__kmOpen?'':'none';
-document.getElementById('kmTitleRow').classList.toggle('open',!!window.__kmOpen);
+
 
 document.getElementById('week-title').textContent='KW '+cur.kw;
 const tiles=document.getElementById('tiles');
@@ -1073,7 +1074,7 @@ const agentColors=[C.s1,C.s2,C.s3,C.s5];
 
   const tbl=document.createElement('table');tbl.className='agent-tbl';
   const hr=document.createElement('tr');
-  ['Agent','Status','Messages','Ø AHT','Ist-Std.','Soll-Std.'].forEach(t=>{
+  ['Agent','Status','Messages','Ist-Std.','Soll-Std.'].forEach(t=>{
     const th=document.createElement('th');th.textContent=t;hr.append(th);});
   tbl.append(hr);
 
@@ -1089,11 +1090,6 @@ const agentColors=[C.s1,C.s2,C.s3,C.s5];
     const nameTd=document.createElement('td');
     const dot=document.createElement('span');dot.className='stdot';dot.style.background=agentColors[i];
     nameTd.append(dot,document.createTextNode(a));tr.append(nameTd);
-    // AHT: letzte Woche, sonst jüngster verfügbarer Wert
-    let ahtVal=r.aht;
-    if(ahtVal==null)for(let j=D.team.length-1;j>=0;j--){
-      if(D.team[j][a]&&D.team[j][a].aht!=null){ahtVal=D.team[j][a].aht;break;}}
-
     const stTd=document.createElement('td');
     const badge=document.createElement('span');badge.className='badge '+(st||'na');
     badge.textContent=st==='on'?'✓ On Track':(st==='off'?'✗ Off Track':'–');
@@ -1102,7 +1098,6 @@ const agentColors=[C.s1,C.s2,C.s3,C.s5];
     const td=(txt)=>{const d=document.createElement('td');d.textContent=txt;return d;};
     const hh=v=>v!=null?v.toLocaleString('de-DE',{maximumFractionDigits:1})+' h':'–';
     tr.append(td(r.messages!=null?fmtN(r.messages):'–'));
-    tr.append(td(ahtVal!=null?fmtMin(ahtVal):'–'));
     tr.append(td(hh(r.abs)));
     tr.append(td(hh(r.rel)));
     tbl.append(tr);
@@ -1217,10 +1212,20 @@ periodSel.addEventListener('change',()=>{
   history.replaceState(null,'',u);
   if(lastData)renderAll(lastData);
 });
-document.getElementById('kmTitleRow').addEventListener('click',()=>{
-  window.__kmOpen=!window.__kmOpen;
-  document.getElementById('kmtiles').style.display=window.__kmOpen?'':'none';
-  document.getElementById('kmTitleRow').classList.toggle('open',!!window.__kmOpen);
+// Jede Sektion (Titel-Klick) vollständig ein-/ausklappbar
+document.querySelectorAll('.section-title').forEach(title=>{
+  const content=title.nextElementSibling;
+  if(!content||!content.matches('.tiles,.grid'))return;
+  if(!title.querySelector('.sec-chev')){
+    const chev=document.createElement('span');chev.className='sec-chev';chev.textContent='▼';
+    title.append(chev);
+  }
+  if(content.style.display==='none')title.classList.add('collapsed');
+  title.addEventListener('click',()=>{
+    const hide=content.style.display!=='none';
+    content.style.display=hide?'none':'';
+    title.classList.toggle('collapsed',hide);
+  });
 });
 renderAll(DATA); // eingebettete Daten sofort zeigen — nie eine leere Seite
 
