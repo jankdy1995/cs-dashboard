@@ -1396,15 +1396,6 @@ chartCard(document.getElementById('sec-refunds'),{
             {name:'Brutto',color:C.s3,values:rf.map(r=>r.gross),fmt:fmtEuro}]}
 });
 chartCard(document.getElementById('sec-refunds'),{
-  title:'Contribution pro Refund-Ticket',
-  hint:'Netto gesichertes Geld je Refund-Anfrage (Effizienz der Ablehnungen)',
-  table:{cols:['Zeitraum','Netto je Ticket'],
-    rows:rf.map(r=>[r.label,(r.net&&r.refund_tickets)?fmtEuro2(r.net/r.refund_tickets):'–'])},
-  spec:{defaultView:'linie',labels:kwl,yFmt:v=>v+' €',
-    series:[{name:'Netto je Ticket',color:C.s8,
-      values:rf.map(r=>(r.net&&r.refund_tickets)?r.net/r.refund_tickets:null),fmt:fmtEuro2}]}
-});
-chartCard(document.getElementById('sec-refunds'),{
   title:'Share of Refund Tickets',hint:'Anteil der Refund-Tickets am Gesamtvolumen',
   table:{cols:['Zeitraum','Anteil'],rows:rf.map(r=>[r.label,fmtP(r.share)])},
   spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',labelLast:true,
