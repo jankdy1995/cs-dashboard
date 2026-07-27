@@ -168,6 +168,7 @@
       <div class="sub" id="subline"></div>
     </div>
     <div class="hdr-controls">
+      <select class="period-sel" id="weekSel" title="Bezugswoche wählen"></select>
       <select class="period-sel" id="periodSel" title="Zeitraum wählen">
         <option value="woche">Wöchentlich</option>
         <option value="monat">Monatlich</option>
@@ -190,7 +191,7 @@
   <div class="section-title" style="--acc:var(--s3)" id="kmTitleRow">⭐ Key Metrics — <span id="km-title"></span><span class="rule"></span></div>
   <div class="tiles km" id="kmtiles" style="display:none"></div>
 
-  <div class="section-title" style="--acc:var(--s1)">📆 Letzte Woche — <span id="week-title"></span><span class="rule"></span></div>
+  <div class="section-title" style="--acc:var(--s1)">📆 <span id="week-prefix">Letzte Woche</span> — <span id="week-title"></span><span class="rule"></span></div>
   <div class="tiles" id="tiles"></div>
 
   <div class="section-title" style="--acc:var(--s1)">🎫 Tickets &amp; Support (HubSpot)<span class="rule"></span></div>
@@ -722,7 +723,9 @@ function computeKeymetrics(D){
   const ghs=grp(D.hubspot),gma=grp(D.moinai),grf=grp(D.refunds),gtm=grp(D.team);
   const months=Object.keys(ghs).map(Number).sort((a,b)=>a-b);
   if(!months.length)return null;
-  const nowM=new Date().getMonth()+1;
+  // "aktueller Monat" = Monat der letzten (ggf. gewählten) Woche + 1
+  const lastKw=D.hubspot.length?D.hubspot[D.hubspot.length-1].kw:null;
+  const nowM=(lastKw!=null?monthOfKW(lastKw):new Date().getMonth())+1;
   const done=months.filter(m=>m<nowM);
   const sel=done.length?done[done.length-1]:months[months.length-1];
   const avg=v=>{v=v.filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b)/v.length:null;};
@@ -796,10 +799,32 @@ function aggregate(D,period){
 
 /* ---------- Build ---------- */
 let lastData=null;
-function renderAll(D){
+function renderAll(Dfull){
 ['kmtiles','tiles','sec-hubspot','sec-moinai','sec-team','sec-refunds','sec-costs']
   .forEach(id=>document.getElementById(id).replaceChildren());
-lastData=D;
+lastData=Dfull;
+// Bezugswoche bestimmen (gewählte KW oder neueste) + Wochen-Auswähler füllen
+const allKw=Dfull.hubspot.map(r=>r.kw);
+const latestKw=allKw[allKw.length-1];
+let refKw=window.__refWeekKw;
+if(refKw==null||!allKw.includes(refKw))refKw=latestKw;
+(function fillWeekSel(){
+  const sel=document.getElementById('weekSel');
+  const want=allKw.map(k=>String(k)).join(',');
+  if(sel.dataset.kws!==want){
+    sel.replaceChildren();
+    allKw.slice().reverse().forEach(k=>{
+      const o=document.createElement('option');o.value=String(k);
+      o.textContent='KW '+k+(k===latestKw?' (aktuell)':'');
+      sel.append(o);});
+    sel.dataset.kws=want;
+  }
+  sel.value=String(refKw);
+})();
+// Daten bis zur Bezugswoche zuschneiden
+const cut=arr=>arr.filter(r=>r.kw<=refKw);
+const D=Object.assign({},Dfull,{hubspot:cut(Dfull.hubspot),moinai:cut(Dfull.moinai),
+  refunds:cut(Dfull.refunds),team:cut(Dfull.team)});
 const period=document.getElementById('periodSel').value;
 const A=aggregate(D,period);
 const hs=A.hubspot, ma=A.moinai, tm=A.team, rf=A.refunds, co=D.costs;
@@ -815,8 +840,8 @@ const coC=co[co.length-1]||{};
 const standTxt=D.live
   ?'Live aus Google Sheets · '+new Date().toLocaleString('de-DE',{dateStyle:'short',timeStyle:'short'})+' Uhr'
   :`Stand: ${META.updated} (letzter Build)`;
-document.getElementById('subline').textContent=
-  `Letzte Woche: KW ${cur.kw} · ${standTxt}`;
+const histTxt=(refKw!==latestKw)?`Bezugswoche: KW ${cur.kw} (historisch)`:`Letzte Woche: KW ${cur.kw}`;
+document.getElementById('subline').textContent=`${histTxt} · ${standTxt}`;
 document.getElementById('footline').textContent=
   `Quelle: NeoTaste CS KPI-Liste (Google Sheets) · ${standTxt} · Zeitraum: KW ${D.hubspot[0].kw}–${cur.kw}`;
 
@@ -944,6 +969,7 @@ if(KM&&KM.cur){
 
 
 document.getElementById('week-title').textContent='KW '+cur.kw;
+document.getElementById('week-prefix').textContent=(refKw!==latestKw)?'Bezugswoche':'Letzte Woche';
 const tiles=document.getElementById('tiles');
 tiles.append(
   tile('Erstellte Tickets (KW '+cur.kw+')',fmtN(cur.created),rel(cur.created,prev.created),'down'),
@@ -1208,6 +1234,16 @@ const urlPeriod=new URLSearchParams(location.search).get('zeitraum');
 if(['woche','monat','jahr'].includes(urlPeriod))periodSel.value=urlPeriod;
 periodSel.addEventListener('change',()=>{
   const u=new URL(location);u.searchParams.set('zeitraum',periodSel.value);
+  history.replaceState(null,'',u);
+  if(lastData)renderAll(lastData);
+});
+// Bezugswoche wählen (aus URL wiederherstellen + Umschalten verdrahten)
+const weekSel=document.getElementById('weekSel');
+const urlWeek=parseInt(new URLSearchParams(location.search).get('kw'),10);
+if(!isNaN(urlWeek))window.__refWeekKw=urlWeek;
+weekSel.addEventListener('change',()=>{
+  window.__refWeekKw=parseInt(weekSel.value,10);
+  const u=new URL(location);u.searchParams.set('kw',weekSel.value);
   history.replaceState(null,'',u);
   if(lastData)renderAll(lastData);
 });
