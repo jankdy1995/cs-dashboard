@@ -1173,8 +1173,7 @@ tiles.append(
   tile('Weekly Savings (MoinAI)',fmtEuro(maC.savings),rel(maC.savings,maP.savings),'up',null,null,
     'Berechnung: Direkt vom Chatbot gelöste Anfragen × Kosten pro Chatbot-Konversation × 7. Kosten pro Konversation = 2.000 € MoinAI-Flat-Fee ÷ Chatbot-Konversationen der Woche. Quelle: Sheet MoinAI_KPIs, Spalte \'Weekly Savings\'.'),
   tile('Net Contribution (Refunds)',fmtEuro(rfC.net),rel(rfC.net,rfP.net),'up'),
-  tile('Messages per Ticket',
-    cur.msg_per_ticket!=null?cur.msg_per_ticket.toLocaleString('de-DE',{maximumFractionDigits:2}):'–',
+  tile('Messages per Ticket',fmtP(cur.msg_per_ticket),
     rel(cur.msg_per_ticket,prev.msg_per_ticket),'up')
 );
 
