@@ -1048,6 +1048,8 @@ const period=document.getElementById('periodSel').value;
 const A=aggregate(D,period);
 const hs=A.hubspot, ma=A.moinai, tm=A.team, rf=A.refunds, co=D.costs;
 const kwl=hs.map(r=>r.label);
+const maL=ma.map(r=>r.label);
+const rfL=rf.map(r=>r.label);
 // Kacheln "Aktuelle Woche" + Deltas immer auf Wochenbasis (Rohdaten)
 const curW=D.hubspot[D.hubspot.length-1];
 const cur=Object.assign({},curW,{label:'KW '+curW.kw});
@@ -1240,7 +1242,7 @@ chartCard(document.getElementById('sec-moinai'),{
   legend:[{name:'HubSpot',color:C.s1},{name:'Chatbot',color:C.s2}],
   table:{cols:['Zeitraum','HubSpot','Chatbot','Gesamt'],
     rows:ma.map(r=>[r.label,fmtN(r.conv_hubspot),fmtN(r.conv_chatbot),fmtN(r.conv_total)])},
-  spec:{defaultView:'balken',labels:kwl,yFmt:fmtN,totalLabelLast:true,
+  spec:{defaultView:'balken',labels:maL,yFmt:fmtN,totalLabelLast:true,
     series:[{name:'HubSpot',color:C.s1,values:ma.map(r=>r.conv_hubspot)},
             {name:'Chatbot',color:C.s2,values:ma.map(r=>r.conv_chatbot)}]}
 });
@@ -1250,7 +1252,7 @@ chartCard(document.getElementById('sec-moinai'),{
           {name:'Alle Tickets',color:C.s2,type:'line'}],
   table:{cols:['Zeitraum','Chatbot','Alle Tickets'],
     rows:ma.map(r=>[r.label,fmtP(r.auto_bot),fmtP(r.auto_all)])},
-  spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',labelSeries:1,target:0.30,
+  spec:{defaultView:'linie',labels:maL,yFmt:v=>Math.round(v*100)+' %',labelSeries:1,target:0.30,
     series:[{name:'Chatbot',color:C.s1,values:ma.map(r=>r.auto_bot),fmt:fmtP},
             {name:'Alle Tickets',color:C.s2,values:ma.map(r=>r.auto_all),fmt:fmtP}]}
 });
@@ -1258,13 +1260,13 @@ chartCard(document.getElementById('sec-moinai'),{
   title:'Savings',hint:'Ersparnis durch Chatbot-Automatisierung',
   explain:'Berechnung: Direkt vom Chatbot gelöste Anfragen × Kosten pro Chatbot-Konversation × 7. Kosten pro Konversation = 2.000 € MoinAI-Flat-Fee ÷ Chatbot-Konversationen der Woche. Quelle: Sheet MoinAI_KPIs, Spalte \'Weekly Savings\'.',
   table:{cols:['Zeitraum','Savings'],rows:ma.map(r=>[r.label,fmtEuro(r.savings)])},
-  spec:{defaultView:'balken',labels:kwl,yFmt:v=>fmtN(v),totalLabelLast:true,
+  spec:{defaultView:'balken',labels:maL,yFmt:v=>fmtN(v),totalLabelLast:true,
     series:[{name:'Savings',color:C.s2,values:ma.map(r=>r.savings),fmt:fmtEuro}]}
 });
 chartCard(document.getElementById('sec-moinai'),{
   title:'Takeovers',hint:'Konversationen mit Übernahme durch das Team',
   table:{cols:['Zeitraum','Takeovers'],rows:ma.map(r=>[r.label,fmtN(r.takeovers)])},
-  spec:{defaultView:'linie',labels:kwl,yFmt:fmtN,labelLast:true,
+  spec:{defaultView:'linie',labels:maL,yFmt:fmtN,labelLast:true,
     series:[{name:'Takeovers',color:C.s2,values:ma.map(r=>r.takeovers),fmt:fmtN}]}
 });
 
@@ -1396,14 +1398,14 @@ chartCard(document.getElementById('sec-refunds'),{
   table:{cols:['Zeitraum','Abgelehnt','Erstattet','Gesamt','Decline Rate'],
     rows:rf.map(r=>[r.label,fmtN(r.negative),fmtN(r.positive),
       fmtN(r.refund_tickets),fmtP(r.decline_rate)])},
-  spec:{defaultView:'balken',labels:kwl,yFmt:fmtN,totalLabelLast:true,
+  spec:{defaultView:'balken',labels:rfL,yFmt:fmtN,totalLabelLast:true,
     series:[{name:'Abgelehnt',color:C.s8,values:rf.map(r=>r.negative)},
             {name:'Erstattet',color:C.s2,values:rf.map(r=>r.positive)}]}
 });
 chartCard(document.getElementById('sec-refunds'),{
   title:'Refund Decline Rate',hint:'Anteil abgelehnter Refund-Anfragen',
   table:{cols:['Zeitraum','Decline Rate'],rows:rf.map(r=>[r.label,fmtP(r.decline_rate)])},
-  spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',target:0.90,trend:true,
+  spec:{defaultView:'linie',labels:rfL,yFmt:v=>Math.round(v*100)+' %',target:0.90,trend:true,
     series:[{name:'Decline Rate',color:C.s8,values:rf.map(r=>r.decline_rate),fmt:fmtP}]}
 });
 chartCard(document.getElementById('sec-refunds'),{
@@ -1411,14 +1413,14 @@ chartCard(document.getElementById('sec-refunds'),{
   legend:[{name:'Netto',color:C.s8,type:'line'},{name:'Brutto',color:C.s3,type:'line'}],
   table:{cols:['Zeitraum','Netto','Brutto'],
     rows:rf.map(r=>[r.label,fmtEuro(r.net),fmtEuro(r.gross)])},
-  spec:{defaultView:'linie',labels:kwl,yFmt:fmtN,
+  spec:{defaultView:'linie',labels:rfL,yFmt:fmtN,
     series:[{name:'Netto',color:C.s8,values:rf.map(r=>r.net),fmt:fmtEuro},
             {name:'Brutto',color:C.s3,values:rf.map(r=>r.gross),fmt:fmtEuro}]}
 });
 chartCard(document.getElementById('sec-refunds'),{
   title:'Share of Refund Tickets',hint:'Anteil der Refund-Tickets am Gesamtvolumen',
   table:{cols:['Zeitraum','Anteil'],rows:rf.map(r=>[r.label,fmtP(r.share)])},
-  spec:{defaultView:'linie',labels:kwl,yFmt:v=>Math.round(v*100)+' %',labelLast:true,
+  spec:{defaultView:'linie',labels:rfL,yFmt:v=>Math.round(v*100)+' %',labelLast:true,
     series:[{name:'Anteil',color:C.s8,values:rf.map(r=>r.share),fmt:fmtP}]}
 });
 
