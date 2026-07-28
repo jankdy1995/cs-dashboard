@@ -1101,7 +1101,7 @@ const agentColors=[C.s1,C.s2,C.s3,C.s5];
 
   const tbl=document.createElement('table');tbl.className='agent-tbl';
   const hr=document.createElement('tr');
-  ['Agent','Status','Messages','Ist-Std.','Soll-Std.'].forEach(t=>{
+  ['Agent','Status','Messages','Ist-Std.','Soll-Std.','Diff (Ist−Soll)','Note'].forEach(t=>{
     const th=document.createElement('th');th.textContent=t;hr.append(th);});
   tbl.append(hr);
 
@@ -1122,11 +1122,21 @@ const agentColors=[C.s1,C.s2,C.s3,C.s5];
     badge.textContent=st==='on'?'✓ On Track':(st==='off'?'✗ Off Track':'–');
     stTd.append(badge);tr.append(stTd);
 
-    const td=(txt)=>{const d=document.createElement('td');d.textContent=txt;return d;};
+    const td=(txt,col)=>{const d=document.createElement('td');d.textContent=txt;
+      if(col)d.style.color=col;return d;};
     const hh=v=>v!=null?v.toLocaleString('de-DE',{maximumFractionDigits:1})+' h':'–';
     tr.append(td(r.messages!=null?fmtN(r.messages):'–'));
     tr.append(td(hh(r.abs)));
     tr.append(td(hh(r.rel)));
+    // Differenz Ist − Soll (positiv = über Soll)
+    let diffTxt='–', diffCol=null;
+    if(r.abs!=null&&r.rel!=null){
+      const dff=r.abs-r.rel;
+      diffTxt=(dff>=0?'+':'−')+Math.abs(dff).toLocaleString('de-DE',{maximumFractionDigits:1})+' h';
+      diffCol=css(dff>=0?'--st-good':'--st-crit');
+    }
+    tr.append(td(diffTxt,diffCol));
+    tr.append(td(r.note||'/'));
     tbl.append(tr);
   });
   card.append(tbl);
