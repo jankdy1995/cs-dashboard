@@ -387,7 +387,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       <div class="sub" id="subline"></div>
     </div>
     <div class="hdr-controls">
-      <select class="period-sel" id="weekSel" title="Bezugswoche wählen"></select>
+      <select class="period-sel" id="monthSel" title="Monat wählen (wochenweise)"></select>
       <select class="period-sel" id="periodSel" title="Zeitraum wählen">
         <option value="woche">Wöchentlich</option>
         <option value="monat">Monatlich</option>
@@ -936,17 +936,22 @@ function monthOfKW(kw){ // Monat des Donnerstags der ISO-Woche
   const thu=new Date(mon1);thu.setUTCDate(mon1.getUTCDate()+(kw-1)*7+3);
   return thu.getUTCMonth()+1;
 }
-function computeKeymetrics(D){
+function computeKeymetrics(D,forceMonth){
   const grp=rows=>{const g={};rows.forEach(r=>{const m=monthOfKW(r.kw);
     (g[m]=g[m]||[]).push(r);});return g;};
   const ghs=grp(D.hubspot),gma=grp(D.moinai),grf=grp(D.refunds),gtm=grp(D.team);
   const months=Object.keys(ghs).map(Number).sort((a,b)=>a-b);
   if(!months.length)return null;
-  // "aktueller Monat" = Monat der letzten (ggf. gewählten) Woche + 1
-  const lastKw=D.hubspot.length?D.hubspot[D.hubspot.length-1].kw:null;
-  const nowM=(lastKw!=null?monthOfKW(lastKw):new Date().getMonth())+1;
-  const done=months.filter(m=>m<nowM);
-  const sel=done.length?done[done.length-1]:months[months.length-1];
+  let sel;
+  if(forceMonth&&months.includes(forceMonth)){
+    sel=forceMonth;
+  }else{
+    // "aktueller Monat" = Monat der letzten Woche + 1 → letzter abgeschlossener Monat
+    const lastKw=D.hubspot.length?D.hubspot[D.hubspot.length-1].kw:null;
+    const nowM=(lastKw!=null?monthOfKW(lastKw):new Date().getMonth())+1;
+    const done=months.filter(m=>m<nowM);
+    sel=done.length?done[done.length-1]:months[months.length-1];
+  }
   const avg=v=>{v=v.filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b)/v.length:null;};
   const sum=v=>{v=v.filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b):null;};
   const costsBy={};(D.costs||[]).forEach(c=>costsBy[c.month]=c);
@@ -1022,28 +1027,29 @@ function renderAll(Dfull){
 ['kmtiles','tiles','sec-hubspot','sec-moinai','sec-team','sec-refunds','sec-costs']
   .forEach(id=>document.getElementById(id).replaceChildren());
 lastData=Dfull;
-// Bezugswoche bestimmen (gewählte KW oder neueste) + Wochen-Auswähler füllen
-const allKw=Dfull.hubspot.map(r=>r.kw);
-const latestKw=allKw[allKw.length-1];
-let refKw=window.__refWeekKw;
-if(refKw==null||!allKw.includes(refKw))refKw=latestKw;
-(function fillWeekSel(){
-  const sel=document.getElementById('weekSel');
-  const want=allKw.map(k=>String(k)).join(',');
-  if(sel.dataset.kws!==want){
+// Monat bestimmen (gewählter Monat oder "alle") + Monats-Auswähler füllen
+const monthsPresent=[...new Set(Dfull.hubspot.map(r=>monthOfKW(r.kw)))].filter(m=>m).sort((a,b)=>a-b);
+const latestMonth=monthsPresent[monthsPresent.length-1];
+let selMonth=window.__refMonth;   // '' = alle, sonst Monatszahl
+if(selMonth!==''&&(selMonth==null||!monthsPresent.includes(selMonth)))selMonth='';
+(function fillMonthSel(){
+  const sel=document.getElementById('monthSel');
+  const want='|'+monthsPresent.join(',');
+  if(sel.dataset.months!==want){
     sel.replaceChildren();
-    allKw.slice().reverse().forEach(k=>{
-      const o=document.createElement('option');o.value=String(k);
-      o.textContent='KW '+k+(k===latestKw?' (aktuell)':'');
-      sel.append(o);});
-    sel.dataset.kws=want;
+    const oAll=document.createElement('option');oAll.value='';oAll.textContent='Alle Monate';sel.append(oAll);
+    monthsPresent.slice().reverse().forEach(m=>{
+      const o=document.createElement('option');o.value=String(m);
+      o.textContent=MONTHS_DE[m]+(m===latestMonth?' (aktuell)':'');sel.append(o);});
+    sel.dataset.months=want;
   }
-  sel.value=String(refKw);
+  sel.value=(selMonth===''?'':String(selMonth));
 })();
-// Daten bis zur Bezugswoche zuschneiden
-const cut=arr=>arr.filter(r=>r.kw<=refKw);
-const D=Object.assign({},Dfull,{hubspot:cut(Dfull.hubspot),moinai:cut(Dfull.moinai),
-  refunds:cut(Dfull.refunds),team:cut(Dfull.team)});
+// Daten auf die Wochen des gewählten Monats filtern (bei "alle" alles)
+const inMon=arr=>selMonth===''?arr:arr.filter(r=>monthOfKW(r.kw)===selMonth);
+const D=Object.assign({},Dfull,{hubspot:inMon(Dfull.hubspot),moinai:inMon(Dfull.moinai),
+  refunds:inMon(Dfull.refunds),team:inMon(Dfull.team)});
+const latestKw=Dfull.hubspot[Dfull.hubspot.length-1].kw;
 const period=document.getElementById('periodSel').value;
 const A=aggregate(D,period);
 const hs=A.hubspot, ma=A.moinai, tm=A.team, rf=A.refunds, co=D.costs;
@@ -1061,7 +1067,9 @@ const coC=co[co.length-1]||{};
 const standTxt=D.live
   ?'Live aus Google Sheets · '+new Date().toLocaleString('de-DE',{dateStyle:'short',timeStyle:'short'})+' Uhr'
   :`Stand: ${META.updated} (letzter Build)`;
-const histTxt=(refKw!==latestKw)?`Bezugswoche: KW ${cur.kw} (historisch)`:`Letzte Woche: KW ${cur.kw}`;
+const histTxt=(selMonth==='')
+  ?`Letzte Woche: KW ${cur.kw}`
+  :`Monat: ${MONTHS_DE[selMonth]} · Wochen KW ${D.hubspot[0].kw}–${cur.kw}`;
 document.getElementById('subline').textContent=`${histTxt} · ${standTxt}`;
 document.getElementById('footline').textContent=
   `Quelle: NeoTaste CS KPI-Liste (Google Sheets) · ${standTxt} · Zeitraum: KW ${D.hubspot[0].kw}–${cur.kw}`;
@@ -1155,7 +1163,7 @@ document.getElementById('footline').textContent=
 })();
 
 /* Key Metrics (Monatssicht) */
-const KM=computeKeymetrics(D);
+const KM=computeKeymetrics(Dfull,selMonth===''?null:selMonth);
 if(KM&&KM.cur){
   const k=KM.cur,p=KM.prev||{};
   const vsLbl='vs. '+(KM.prev_month||'Vormonat');
@@ -1190,7 +1198,7 @@ if(KM&&KM.cur){
 
 
 document.getElementById('week-title').textContent='KW '+cur.kw;
-document.getElementById('week-prefix').textContent=(refKw!==latestKw)?'Bezugswoche':'Letzte Woche';
+document.getElementById('week-prefix').textContent=(selMonth==='')?'Letzte Woche':('Letzte Woche · '+MONTHS_DE[selMonth]);
 const tiles=document.getElementById('tiles');
 tiles.append(
   tile('Erstellte Tickets (KW '+cur.kw+')',fmtN(cur.created),rel(cur.created,prev.created),'down'),
@@ -1468,13 +1476,15 @@ periodSel.addEventListener('change',()=>{
   history.replaceState(null,'',u);
   if(lastData)renderAll(lastData);
 });
-// Bezugswoche wählen (aus URL wiederherstellen + Umschalten verdrahten)
-const weekSel=document.getElementById('weekSel');
-const urlWeek=parseInt(new URLSearchParams(location.search).get('kw'),10);
-if(!isNaN(urlWeek))window.__refWeekKw=urlWeek;
-weekSel.addEventListener('change',()=>{
-  window.__refWeekKw=parseInt(weekSel.value,10);
-  const u=new URL(location);u.searchParams.set('kw',weekSel.value);
+// Monat wählen (aus URL wiederherstellen + Umschalten verdrahten)
+const monthSel=document.getElementById('monthSel');
+const urlMonth=parseInt(new URLSearchParams(location.search).get('monat'),10);
+if(!isNaN(urlMonth))window.__refMonth=urlMonth;
+monthSel.addEventListener('change',()=>{
+  window.__refMonth=monthSel.value===''?'':parseInt(monthSel.value,10);
+  const u=new URL(location);
+  if(monthSel.value==='')u.searchParams.delete('monat');
+  else u.searchParams.set('monat',monthSel.value);
   history.replaceState(null,'',u);
   if(lastData)renderAll(lastData);
 });
