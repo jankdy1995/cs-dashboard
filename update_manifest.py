@@ -41,10 +41,16 @@ def parse_month(title):
     return f'{year:04d}-{num:02d}', f'{de} {year}'
 
 
-def is_pdf(f):
-    return (f.get('mimeType') == 'application/pdf'
-            or str(f.get('fileExtension', '')).lower() == 'pdf'
-            or str(f.get('title', '')).lower().endswith('.pdf'))
+def file_kind(f):
+    """'pdf', 'pptx' oder None (z. B. Vorlage / anderes)."""
+    ext = str(f.get('fileExtension', '')).lower()
+    mt = str(f.get('mimeType', ''))
+    title = str(f.get('title', '')).lower()
+    if ext == 'pdf' or mt == 'application/pdf' or title.endswith('.pdf'):
+        return 'pdf'
+    if ext == 'pptx' or 'presentationml' in mt or title.endswith('.pptx'):
+        return 'pptx'
+    return None
 
 
 def dl_link(f):
@@ -55,21 +61,29 @@ def dl_link(f):
 
 
 def build(files):
+    """Ein Eintrag je Monat mit pdf- und/oder pptx-Link (neueste Datei je Typ)."""
     by_key = {}
     for f in files:
-        if not is_pdf(f):
+        kind = file_kind(f)
+        if not kind:
             continue
         parsed = parse_month(f.get('title', ''))
-        if not parsed:
+        if not parsed:                      # z. B. Vorlage ohne Monat → überspringen
             continue
         key, label = parsed
-        # bei mehreren PDFs pro Monat: das zuletzt geänderte gewinnt
-        prev = by_key.get(key)
-        if prev is None or str(f.get('modifiedTime', '')) >= prev['_mt']:
-            by_key[key] = {'label': label, 'key': key, 'pdf': dl_link(f),
-                           '_mt': str(f.get('modifiedTime', ''))}
-    out = [{'label': v['label'], 'key': v['key'], 'pdf': v['pdf']}
-           for v in sorted(by_key.values(), key=lambda x: x['key'], reverse=True)]
+        e = by_key.setdefault(key, {'label': label, 'key': key, '_mt': {}})
+        mt = str(f.get('modifiedTime', ''))
+        if kind not in e or mt >= e['_mt'].get(kind, ''):
+            e[kind] = dl_link(f)
+            e['_mt'][kind] = mt
+    out = []
+    for v in sorted(by_key.values(), key=lambda x: x['key'], reverse=True):
+        item = {'label': v['label'], 'key': v['key']}
+        if v.get('pdf'):
+            item['pdf'] = v['pdf']
+        if v.get('pptx'):
+            item['pptx'] = v['pptx']
+        out.append(item)
     return out
 
 

@@ -1,4 +1,258 @@
-<!DOCTYPE html>
+#!/usr/bin/env python3
+"""NeoTaste CS KPI Dashboard Builder.
+
+Liest die aktuellste NeoTaste CS KPI-Excel und erzeugt ein self-contained
+HTML-Dashboard (dashboard.html). Wird auch von der täglichen geplanten
+Aufgabe verwendet.
+
+Usage: python3 build_dashboard.py <xlsx-path> <output-html-path>
+"""
+import json
+import sys
+from datetime import date
+
+import openpyxl
+
+MONTHS_DE = ['', 'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
+             'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember']
+
+
+def num(v):
+    """Return float or None for messy cells (#REF!, '/', '#VALUE!', text)."""
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        return float(v)
+    return None
+
+
+def extract(path):
+    wb = openpyxl.load_workbook(path, data_only=True)
+
+    def rows(sheet, start=4, kwcol=0, maxcol=25):
+        ws = wb[sheet]
+        out = []
+        for r in ws.iter_rows(min_row=start, max_row=ws.max_row,
+                              max_col=maxcol, values_only=True):
+            if num(r[kwcol]) is None:
+                break
+            out.append(r)
+        return out
+
+    def sheet_like(*needles):
+        """Tab-Namen tolerant auflösen (z. B. MoinAI → ChatBot Umbenennung)."""
+        for nm in wb.sheetnames:
+            low = nm.lower()
+            if any(n.lower() in low for n in needles):
+                return nm
+        raise KeyError('Kein Tab passend zu ' + '/'.join(needles)
+                       + ' — vorhanden: ' + ', '.join(wb.sheetnames))
+
+    d = {}
+
+    hs = rows(sheet_like('hubspot'), maxcol=8)
+    d['hubspot'] = [{
+        'kw': int(r[0]), 'created': num(r[1]), 'user': num(r[2]),
+        'partner': num(r[3]), 'messages': num(r[4]), 'csat': num(r[5]),
+        'mtfr': num(r[6]), 'msg_per_ticket': num(r[7]),
+    } for r in hs]
+
+    ma = rows(sheet_like('moinai', 'chatbot'), maxcol=11)
+    d['moinai'] = [{
+        'kw': int(r[0]), 'conv_hubspot': num(r[1]), 'conv_chatbot': num(r[2]),
+        'conv_total': num(r[3]), 'share_chatbot': num(r[4]),
+        'takeovers': num(r[5]), 'solved_bot': num(r[6]),
+        'auto_bot': num(r[7]), 'auto_all': num(r[8]),
+        'cost_per_ticket': num(r[9]), 'savings': num(r[10]),
+    } for r in ma]
+
+    # Agents + Spalten dynamisch aus den Kopfzeilen erkennen (Zeile 2 = Agent-
+    # Namen je Block, Zeile 3 = Sub-Header). So passt sich der Build automatisch
+    # an, wenn Agents hinzukommen oder entfernt werden (z. B. Jan).
+    tpw = wb[sheet_like('team_performance', 'team perf', 'team')]
+    hdr_ag = [c.value for c in tpw[2]]
+    hdr_sub = [str(c.value or '').lower() for c in tpw[3]]
+    bases = [(i, str(v).replace('👤', '').strip())
+             for i, v in enumerate(hdr_ag) if v and str(v).strip()]
+
+    def col_in(lo, hi, needles, exclude=()):
+        for i in range(lo, min(hi, len(hdr_sub))):
+            h = hdr_sub[i]
+            if any(nd in h for nd in needles) and not any(e in h for e in exclude):
+                return i
+        return None
+
+    agents = {}
+    for k, (ci, name) in enumerate(bases):
+        hi = bases[k + 1][0] if k + 1 < len(bases) else len(hdr_sub)
+        abs_col = col_in(ci, hi, ('absolute',))
+        agents[name] = {
+            'msg': col_in(ci, hi, ('message',)),
+            'aht': col_in(ci, hi, ('aht',), exclude=('team',)),
+            'contract': col_in(ci, hi, ('contract',)),
+            'projekt': col_in(ci, hi, ('projekt', 'project')),
+            'meeting': col_in(ci, hi, ('meeting',)),
+            'off': col_in(ci, hi, ('hours off', 'off')),
+            'note': col_in(ci, hi, ('note',)),
+            'rel': col_in(ci, hi, ('realtive', 'relative')),
+            'abs': abs_col, 'act': abs_col,
+            'ontrack': col_in(ci, hi, ('tracking', 'on track')),
+        }
+    d['team_agents'] = [name for _, name in bases]
+
+    tp = rows(tpw.title, maxcol=max(tpw.max_column, 1))
+    d['team'] = []
+    for r in tp:
+        if num(r[0]) is None:
+            continue
+
+        def cell(i):
+            return num(r[i]) if (i is not None and i < len(r)) else None
+
+        def text(i):
+            v = r[i] if (i is not None and i < len(r)) else None
+            v = str(v).strip() if v not in (None, '', '/') else None
+            return v
+
+        row = {'kw': int(r[0])}
+        for name, m in agents.items():
+            row[name] = {
+                'messages': cell(m.get('msg')), 'aht': cell(m.get('aht')),
+                'active_hours': cell(m.get('act')), 'note': text(m.get('note')),
+                'rel': cell(m.get('rel')), 'abs': cell(m.get('abs')),
+                'ontrack': text(m.get('ontrack')),
+                'contract': cell(m.get('contract')), 'projekt': cell(m.get('projekt')),
+                'meeting': cell(m.get('meeting')), 'off': cell(m.get('off')),
+            }
+        d['team'].append(row)
+
+    rf = rows(sheet_like('refund'), maxcol=9)
+    d['refunds'] = [{
+        'kw': int(r[0]), 'total': num(r[1]), 'refund_tickets': num(r[2]),
+        'positive': num(r[3]), 'negative': num(r[4]),
+        'decline_rate': num(r[5]), 'share': num(r[6]),
+        'net': num(r[7]), 'gross': num(r[8]),
+    } for r in rf]
+
+    # CST_Costs: Spalten über Überschriften finden (Struktur ändert sich gelegentlich)
+    ws = wb[sheet_like('cst_costs', 'costs')]
+    hdr2 = [c.value for c in ws[2]]  # z. B. '👤 CST Gesamt'
+    hdr3 = [c.value for c in ws[3]]  # z. B. 'Created Tickets HubSpot', 'CPT'
+
+    def find_col(headers, *needles):
+        for i, h in enumerate(headers):
+            if h and any(n.lower() in str(h).lower() for n in needles):
+                return i
+        return None
+
+    col_total = find_col(hdr2, 'cst gesamt')
+    col_fee = find_col(hdr2, 'moinai')
+    col_hs = find_col(hdr3, 'created tickets hubspot')
+    col_cb = find_col(hdr3, 'created tickets cb')
+    # bevorzugt die Gesamtspalte "Created Tickets" (exakt), sonst HubSpot-Spalte
+    col_tickets = next((i for i, h in enumerate(hdr3)
+                        if str(h).strip().lower() == 'created tickets'), None)
+    if col_tickets is None:
+        col_tickets = find_col(hdr3, 'created tickets')
+    col_cpt = find_col(hdr3, 'cpt')
+    if col_total is None or col_tickets is None:
+        raise ValueError('CST_Costs: Spalten "CST Gesamt"/"Created Tickets" '
+                         'nicht gefunden — Sheet-Struktur prüfen!')
+
+    d['costs'] = []
+    for r in ws.iter_rows(min_row=4, max_row=ws.max_row,
+                          max_col=ws.max_column, values_only=True):
+        if r[0] is None:
+            break
+        total, tickets = num(r[col_total]), num(r[col_tickets])
+        if total is None:  # Monat noch nicht befüllt
+            continue
+        cpt = num(r[col_cpt]) if col_cpt is not None else None
+        if cpt is None and tickets:
+            cpt = total / tickets
+        d['costs'].append({
+            'month': str(r[0]), 'total_cost': total, 'tickets': tickets,
+            'cpt': cpt,
+            'tickets_hs': num(r[col_hs]) if col_hs is not None else None,
+            'tickets_cb': num(r[col_cb]) if col_cb is not None else None,
+            'moinai_fee': num(r[col_fee]) if col_fee is not None else None,
+        })
+
+    d['keymetrics'] = build_keymetrics(d)
+    return d
+
+
+def build_keymetrics(d):
+    """Monatsaggregate für die Key-Metrics-Sektion (letzter abgeschlossener
+    Monat, Delta vs. Vormonat wo Daten vorhanden)."""
+    year = date.today().year
+
+    def month_of_kw(kw):
+        # Woche gehört zum Monat ihres Donnerstags (ISO-Mehrheitsregel)
+        try:
+            return date.fromisocalendar(year, kw, 4).month
+        except ValueError:
+            return None
+
+    def group(rows_):
+        g = {}
+        for r in rows_:
+            m = month_of_kw(r['kw'])
+            if m:
+                g.setdefault(m, []).append(r)
+        return g
+
+    ghs, gma = group(d['hubspot']), group(d['moinai'])
+    grf, gtm = group(d['refunds']), group(d['team'])
+    months = sorted(ghs)
+    if not months:
+        return None
+    cur_month_today = date.today().month
+    completed = [m for m in months if m < cur_month_today]
+    sel = completed[-1] if completed else months[-1]
+
+    def avg(vals):
+        vals = [v for v in vals if v is not None]
+        return sum(vals) / len(vals) if vals else None
+
+    def total(vals):
+        vals = [v for v in vals if v is not None]
+        return sum(vals) if vals else None
+
+    costs_by_month = {c['month']: c for c in d['costs']}
+
+    def km(m):
+        if m < 1:
+            return None
+        name = MONTHS_DE[m]
+        hsr, mar, rfr, tmr = (g.get(m, []) for g in (ghs, gma, grf, gtm))
+        c = costs_by_month.get(name)
+        if not hsr and not c:
+            return None
+        wsum = wmsg = 0
+        for r in tmr:
+            for a in d.get('team_agents', []):
+                mm, ah = r[a]['messages'], r[a]['aht']
+                if mm and ah:
+                    wsum += mm * ah
+                    wmsg += mm
+        th = c['tickets_hs'] if c else None
+        tc = c['tickets_cb'] if c else None
+        return {
+            'month': name,
+            'tickets_hs': th, 'tickets_cb': tc,
+            'tickets_total': (th or 0) + (tc or 0) if (th or tc) else None,
+            'mtfr': avg([r['mtfr'] for r in hsr]),
+            'csat': avg([r['csat'] for r in hsr]),
+            'auto_all': avg([r['auto_all'] for r in mar]),
+            'savings_rdr': total([r['net'] for r in rfr]),
+            'cpt': c['cpt'] if c else None,
+            'aht': wsum / wmsg if wmsg else None,
+        }
+
+    return {'cur': km(sel), 'prev': km(sel - 1),
+            'prev_month': MONTHS_DE[sel - 1] if sel > 1 else None}
+
+
+HTML_TEMPLATE = r"""<!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="utf-8">
@@ -241,9 +495,9 @@
 </div>
 
 <script>
-const DATA = {"hubspot": [{"kw": 14, "created": 1036.0, "user": 925.0, "partner": 111.0, "messages": null, "csat": 0.5, "mtfr": 48.0, "msg_per_ticket": null}, {"kw": 15, "created": 1054.0, "user": 971.0, "partner": 83.0, "messages": null, "csat": 0.54, "mtfr": 16.2, "msg_per_ticket": null}, {"kw": 16, "created": 1002.0, "user": 936.0, "partner": 66.0, "messages": null, "csat": 0.44, "mtfr": 15.0, "msg_per_ticket": null}, {"kw": 17, "created": 1090.0, "user": 995.0, "partner": 95.0, "messages": null, "csat": 0.48, "mtfr": 17.5, "msg_per_ticket": null}, {"kw": 18, "created": 961.0, "user": 854.0, "partner": 107.0, "messages": null, "csat": 0.43, "mtfr": 40.0, "msg_per_ticket": null}, {"kw": 19, "created": 975.0, "user": 861.0, "partner": 114.0, "messages": null, "csat": 0.6, "mtfr": 16.1, "msg_per_ticket": null}, {"kw": 20, "created": 843.0, "user": 735.0, "partner": 108.0, "messages": null, "csat": 0.42, "mtfr": 16.8, "msg_per_ticket": null}, {"kw": 21, "created": 823.0, "user": 738.0, "partner": 85.0, "messages": null, "csat": 0.3, "mtfr": 13.7, "msg_per_ticket": null}, {"kw": 22, "created": 1007.0, "user": 933.0, "partner": 74.0, "messages": null, "csat": 0.3, "mtfr": 22.7, "msg_per_ticket": null}, {"kw": 23, "created": 1021.0, "user": 857.0, "partner": 164.0, "messages": null, "csat": 0.4, "mtfr": 18.1, "msg_per_ticket": null}, {"kw": 24, "created": 963.0, "user": 841.0, "partner": 122.0, "messages": null, "csat": 0.55, "mtfr": 12.1, "msg_per_ticket": null}, {"kw": 25, "created": 1008.0, "user": 815.0, "partner": 193.0, "messages": null, "csat": 0.4, "mtfr": 13.7, "msg_per_ticket": null}, {"kw": 26, "created": 1033.0, "user": 940.0, "partner": 93.0, "messages": null, "csat": 0.4, "mtfr": 15.8, "msg_per_ticket": null}, {"kw": 27, "created": 1133.0, "user": 903.0, "partner": 230.0, "messages": null, "csat": 0.4, "mtfr": 15.6, "msg_per_ticket": null}, {"kw": 28, "created": 830.0, "user": 745.0, "partner": 85.0, "messages": null, "csat": 0.4, "mtfr": 12.9, "msg_per_ticket": null}, {"kw": 29, "created": 849.0, "user": 776.0, "partner": 73.0, "messages": null, "csat": 0.3, "mtfr": 12.4, "msg_per_ticket": null}, {"kw": 30, "created": 958.0, "user": 870.0, "partner": 88.0, "messages": null, "csat": 0.7, "mtfr": 13.7, "msg_per_ticket": null}, {"kw": 31, "created": 854.0, "user": 773.0, "partner": 81.0, "messages": 1178.0, "csat": 0.55, "mtfr": 6.8, "msg_per_ticket": 0.7249575552}, {"kw": 32, "created": 1090.0, "user": 1016.0, "partner": 74.0, "messages": 1846.0, "csat": 0.6, "mtfr": 12.0, "msg_per_ticket": 0.5904658722}, {"kw": 33, "created": 800.0, "user": 724.0, "partner": 76.0, "messages": 1153.0, "csat": 0.72, "mtfr": 12.0, "msg_per_ticket": 0.6938421509}, {"kw": 34, "created": 992.0, "user": 941.0, "partner": 51.0, "messages": 1174.0, "csat": 0.43, "mtfr": 18.0, "msg_per_ticket": 0.8449744463}, {"kw": 35, "created": 977.0, "user": 899.0, "partner": 78.0, "messages": 1174.0, "csat": 0.5, "mtfr": 16.0, "msg_per_ticket": 0.832197615}, {"kw": 36, "created": 845.0, "user": 770.0, "partner": 75.0, "messages": 1174.0, "csat": 0.52, "mtfr": 11.0, "msg_per_ticket": 0.7197614991}], "moinai": [{"kw": 14, "conv_hubspot": 1036.0, "conv_chatbot": 824.0, "conv_total": 1860.0, "share_chatbot": 0.4430107527, "takeovers": 302.0, "solved_bot": 522.0, "auto_bot": 0.6334951456, "auto_all": 0.2806451613, "cost_per_ticket": 0.6067961165, "savings": 2217.23301}, {"kw": 15, "conv_hubspot": 1054.0, "conv_chatbot": 720.0, "conv_total": 1774.0, "share_chatbot": 0.4058624577, "takeovers": 242.0, "solved_bot": 478.0, "auto_bot": 0.6638888889, "auto_all": 0.2694475761, "cost_per_ticket": 0.6944444444, "savings": 2323.611111}, {"kw": 16, "conv_hubspot": 1002.0, "conv_chatbot": 720.0, "conv_total": 1722.0, "share_chatbot": 0.4181184669, "takeovers": 247.0, "solved_bot": 473.0, "auto_bot": 0.6569444444, "auto_all": 0.2746806039, "cost_per_ticket": 0.6944444444, "savings": 2299.305556}, {"kw": 17, "conv_hubspot": 1090.0, "conv_chatbot": 814.0, "conv_total": 1904.0, "share_chatbot": 0.4275210084, "takeovers": 271.0, "solved_bot": 543.0, "auto_bot": 0.6670761671, "auto_all": 0.2851890756, "cost_per_ticket": 0.6142506143, "savings": 2334.766585}, {"kw": 18, "conv_hubspot": 961.0, "conv_chatbot": 608.0, "conv_total": 1569.0, "share_chatbot": 0.3875079669, "takeovers": 217.0, "solved_bot": 391.0, "auto_bot": 0.6430921053, "auto_all": 0.2492033142, "cost_per_ticket": 0.8223684211, "savings": 2250.822368}, {"kw": 19, "conv_hubspot": 975.0, "conv_chatbot": 573.0, "conv_total": 1548.0, "share_chatbot": 0.3701550388, "takeovers": 188.0, "solved_bot": 385.0, "auto_bot": 0.6719022688, "auto_all": 0.2487080103, "cost_per_ticket": 0.872600349, "savings": 2351.657941}, {"kw": 20, "conv_hubspot": 843.0, "conv_chatbot": 623.0, "conv_total": 1466.0, "share_chatbot": 0.4249658936, "takeovers": 168.0, "solved_bot": 455.0, "auto_bot": 0.7303370787, "auto_all": 0.3103683492, "cost_per_ticket": 0.8025682183, "savings": 2556.179775}, {"kw": 21, "conv_hubspot": 823.0, "conv_chatbot": 539.0, "conv_total": 1362.0, "share_chatbot": 0.3957415565, "takeovers": 195.0, "solved_bot": 344.0, "auto_bot": 0.6382189239, "auto_all": 0.2525697504, "cost_per_ticket": 0.9276437848, "savings": 2233.766234}, {"kw": 22, "conv_hubspot": 1007.0, "conv_chatbot": 610.0, "conv_total": 1617.0, "share_chatbot": 0.3772418058, "takeovers": 190.0, "solved_bot": 420.0, "auto_bot": 0.6885245902, "auto_all": 0.2597402597, "cost_per_ticket": 0.8196721311, "savings": 2409.836066}, {"kw": 23, "conv_hubspot": 1021.0, "conv_chatbot": 624.0, "conv_total": 1645.0, "share_chatbot": 0.379331307, "takeovers": 230.0, "solved_bot": 394.0, "auto_bot": 0.6314102564, "auto_all": 0.2395136778, "cost_per_ticket": 0.8012820513, "savings": 2209.935897}, {"kw": 24, "conv_hubspot": 963.0, "conv_chatbot": 600.0, "conv_total": 1563.0, "share_chatbot": 0.3838771593, "takeovers": 228.0, "solved_bot": 372.0, "auto_bot": 0.62, "auto_all": 0.2380038388, "cost_per_ticket": 0.8333333333, "savings": 2170.0}, {"kw": 25, "conv_hubspot": 1008.0, "conv_chatbot": 581.0, "conv_total": 1589.0, "share_chatbot": 0.3656387665, "takeovers": 227.0, "solved_bot": 354.0, "auto_bot": 0.6092943201, "auto_all": 0.2227816237, "cost_per_ticket": 0.8605851979, "savings": 2132.53012}, {"kw": 26, "conv_hubspot": 1033.0, "conv_chatbot": 645.0, "conv_total": 1678.0, "share_chatbot": 0.384386174, "takeovers": 247.0, "solved_bot": 398.0, "auto_bot": 0.6170542636, "auto_all": 0.2371871275, "cost_per_ticket": 0.7751937984, "savings": 2159.689922}, {"kw": 27, "conv_hubspot": 1133.0, "conv_chatbot": 585.0, "conv_total": 1718.0, "share_chatbot": 0.3405122235, "takeovers": 251.0, "solved_bot": 334.0, "auto_bot": 0.5709401709, "auto_all": 0.1944121071, "cost_per_ticket": 0.8547008547, "savings": 1998.290598}, {"kw": 28, "conv_hubspot": 830.0, "conv_chatbot": 485.0, "conv_total": 1315.0, "share_chatbot": 0.3688212928, "takeovers": 165.0, "solved_bot": 320.0, "auto_bot": 0.6597938144, "auto_all": 0.2433460076, "cost_per_ticket": 1.030927835, "savings": 2309.278351}, {"kw": 29, "conv_hubspot": 849.0, "conv_chatbot": 501.0, "conv_total": 1350.0, "share_chatbot": 0.3711111111, "takeovers": 192.0, "solved_bot": 309.0, "auto_bot": 0.6167664671, "auto_all": 0.2288888889, "cost_per_ticket": 0.998003992, "savings": 2158.682635}, {"kw": 30, "conv_hubspot": 958.0, "conv_chatbot": 505.0, "conv_total": 1463.0, "share_chatbot": 0.3451811347, "takeovers": 199.0, "solved_bot": 306.0, "auto_bot": 0.6059405941, "auto_all": 0.2091592618, "cost_per_ticket": 0.9900990099, "savings": 2120.792079}, {"kw": 31, "conv_hubspot": 854.0, "conv_chatbot": 444.0, "conv_total": 1298.0, "share_chatbot": 0.3420647149, "takeovers": 159.0, "solved_bot": 285.0, "auto_bot": 0.6418918919, "auto_all": 0.219568567, "cost_per_ticket": 1.126126126, "savings": 2246.621622}, {"kw": 32, "conv_hubspot": 1090.0, "conv_chatbot": 484.0, "conv_total": 1574.0, "share_chatbot": 0.3074968234, "takeovers": 191.0, "solved_bot": 293.0, "auto_bot": 0.6053719008, "auto_all": 0.1861499365, "cost_per_ticket": 1.033057851, "savings": 2118.801653}, {"kw": 33, "conv_hubspot": 800.0, "conv_chatbot": 366.0, "conv_total": 1166.0, "share_chatbot": 0.3138936535, "takeovers": 152.0, "solved_bot": 214.0, "auto_bot": 0.5846994536, "auto_all": 0.1835334477, "cost_per_ticket": 1.366120219, "savings": 2046.448087}, {"kw": 34, "conv_hubspot": 992.0, "conv_chatbot": 442.0, "conv_total": 1434.0, "share_chatbot": 0.3082287308, "takeovers": 173.0, "solved_bot": 269.0, "auto_bot": 0.6085972851, "auto_all": 0.1875871688, "cost_per_ticket": 1.131221719, "savings": 2130.090498}, {"kw": 35, "conv_hubspot": 977.0, "conv_chatbot": 432.0, "conv_total": 1409.0, "share_chatbot": 0.3066004258, "takeovers": 195.0, "solved_bot": 237.0, "auto_bot": 0.5486111111, "auto_all": 0.1682044003, "cost_per_ticket": 1.157407407, "savings": 1920.138889}, {"kw": 36, "conv_hubspot": 845.0, "conv_chatbot": 44.0, "conv_total": 889.0, "share_chatbot": 0.04949381327, "takeovers": 14.0, "solved_bot": 30.0, "auto_bot": 0.6818181818, "auto_all": 0.03374578178, "cost_per_ticket": 11.36363636, "savings": 2386.363636}], "team_agents": ["Eli", "Jeanine", "Vivien"], "team": [{"kw": 14, "Eli": {"messages": 775.0, "aht": null, "active_hours": 31.0, "note": "Public Holiday", "rel": 13.0, "abs": 31.0, "ontrack": "On Track", "contract": 40.0, "projekt": 12.0, "meeting": 5.0, "off": 8.0}, "Jeanine": {"messages": 327.0, "aht": null, "active_hours": 13.08, "note": "PH + Holiday", "rel": 10.0, "abs": 13.08, "ontrack": "On Track", "contract": 40.0, "projekt": 8.0, "meeting": 4.0, "off": 16.0}, "Vivien": {"messages": 254.0, "aht": null, "active_hours": 10.16, "note": "Public Holiday", "rel": 8.0, "abs": 10.16, "ontrack": "On Track", "contract": 20.0, "projekt": 0.0, "meeting": 3.0, "off": 8.0}}, {"kw": 15, "Eli": {"messages": 750.0, "aht": null, "active_hours": 30.0, "note": "Public Holiday", "rel": 13.0, "abs": 30.0, "ontrack": "On Track", "contract": 40.0, "projekt": 12.0, "meeting": 5.0, "off": 8.0}, "Jeanine": {"messages": 524.0, "aht": null, "active_hours": 20.96, "note": "Public Holiday", "rel": 18.0, "abs": 20.96, "ontrack": "On Track", "contract": 40.0, "projekt": 8.0, "meeting": 4.0, "off": 8.0}, "Vivien": {"messages": 322.0, "aht": null, "active_hours": 12.88, "note": "Public Holiday", "rel": 8.0, "abs": 12.88, "ontrack": "On Track", "contract": 20.0, "projekt": 0.0, "meeting": 3.0, "off": 8.0}}, {"kw": 16, "Eli": {"messages": 640.0, "aht": null, "active_hours": 25.6, "note": null, "rel": 21.0, "abs": 25.6, "ontrack": "On Track", "contract": 40.0, "projekt": 12.0, "meeting": 5.0, "off": null}, "Jeanine": {"messages": 354.0, "aht": null, "active_hours": 14.16, "note": "Holiday", "rel": 18.0, "abs": 14.16, "ontrack": "Off Track", "contract": 40.0, "projekt": 8.0, "meeting": 4.0, "off": 8.0}, "Vivien": {"messages": 348.0, "aht": null, "active_hours": 13.92, "note": null, "rel": 16.0, "abs": 13.92, "ontrack": "Off Track", "contract": 20.0, "projekt": 0.0, "meeting": 3.0, "off": null}}, {"kw": 17, "Eli": {"messages": 740.0, "aht": null, "active_hours": 29.6, "note": null, "rel": 21.0, "abs": 29.6, "ontrack": "On Track", "contract": 40.0, "projekt": 12.0, "meeting": 5.0, "off": null}, "Jeanine": {"messages": 311.0, "aht": null, "active_hours": 12.44, "note": "Holiday", "rel": 18.0, "abs": 12.44, "ontrack": "Off Track", "contract": 40.0, "projekt": 8.0, "meeting": 4.0, "off": 8.0}, "Vivien": {"messages": 253.0, "aht": null, "active_hours": 10.12, "note": null, "rel": 16.0, "abs": 10.12, "ontrack": "Off Track", "contract": 20.0, "projekt": 0.0, "meeting": 3.0, "off": null}}, {"kw": 18, "Eli": {"messages": 630.0, "aht": null, "active_hours": 25.2, "note": "Public Holiday", "rel": 13.0, "abs": 25.2, "ontrack": "On Track", "contract": 40.0, "projekt": 12.0, "meeting": 5.0, "off": 8.0}, "Jeanine": {"messages": 341.0, "aht": null, "active_hours": 13.64, "note": "Public Holiday", "rel": 18.0, "abs": 13.64, "ontrack": "Off Track", "contract": 40.0, "projekt": 8.0, "meeting": 4.0, "off": 8.0}, "Vivien": {"messages": 323.0, "aht": null, "active_hours": 12.92, "note": "Public Holiday", "rel": 8.0, "abs": 12.92, "ontrack": "On Track", "contract": 20.0, "projekt": 0.0, "meeting": 3.0, "off": 8.0}}, {"kw": 19, "Eli": {"messages": 630.0, "aht": null, "active_hours": 25.2, "note": "Sickness", "rel": 13.0, "abs": 25.2, "ontrack": "On Track", "contract": 40.0, "projekt": 12.0, "meeting": 5.0, "off": 8.0}, "Jeanine": {"messages": 501.0, "aht": null, "active_hours": 20.04, "note": null, "rel": 26.0, "abs": 20.04, "ontrack": "Off Track", "contract": 40.0, "projekt": 8.0, "meeting": 4.0, "off": null}, "Vivien": {"messages": 339.0, "aht": null, "active_hours": 13.56, "note": null, "rel": 16.0, "abs": 13.56, "ontrack": "Off Track", "contract": 20.0, "projekt": 0.0, "meeting": 3.0, "off": null}}, {"kw": 20, "Eli": {"messages": 550.0, "aht": null, "active_hours": 22.0, "note": "Public Holiday", "rel": 13.0, "abs": 22.0, "ontrack": "On Track", "contract": 40.0, "projekt": 12.0, "meeting": 5.0, "off": 8.0}, "Jeanine": {"messages": 241.0, "aht": null, "active_hours": 9.64, "note": "PH + Holiday", "rel": 10.0, "abs": 9.64, "ontrack": "On Track", "contract": 40.0, "projekt": 8.0, "meeting": 4.0, "off": 16.0}, "Vivien": {"messages": 331.0, "aht": null, "active_hours": 13.24, "note": "Public Holiday", "rel": 8.0, "abs": 13.24, "ontrack": "On Track", "contract": 20.0, "projekt": 0.0, "meeting": 3.0, "off": 8.0}}, {"kw": 21, "Eli": {"messages": 590.0, "aht": null, "active_hours": 23.6, "note": null, "rel": 21.0, "abs": 23.6, "ontrack": "On Track", "contract": 40.0, "projekt": 12.0, "meeting": 5.0, "off": null}, "Jeanine": {"messages": 372.0, "aht": null, "active_hours": 14.88, "note": null, "rel": 26.0, "abs": 14.88, "ontrack": "Off Track", "contract": 40.0, "projekt": 8.0, "meeting": 4.0, "off": null}, "Vivien": {"messages": 296.0, "aht": null, "active_hours": 11.84, "note": null, "rel": 16.0, "abs": 11.84, "ontrack": "Off Track", "contract": 20.0, "projekt": 0.0, "meeting": 3.0, "off": null}}, {"kw": 22, "Eli": {"messages": 0.0, "aht": null, "active_hours": 0.0, "note": "PH + Holiday", "rel": -19.0, "abs": 0.0, "ontrack": "On Track", "contract": 40.0, "projekt": 12.0, "meeting": 5.0, "off": 40.0}, "Jeanine": {"messages": 468.0, "aht": null, "active_hours": 18.72, "note": "Public Holiday", "rel": 18.0, "abs": 18.72, "ontrack": "On Track", "contract": 40.0, "projekt": 8.0, "meeting": 4.0, "off": 8.0}, "Vivien": {"messages": 367.0, "aht": null, "active_hours": 14.68, "note": "Public Holiday", "rel": 8.0, "abs": 14.68, "ontrack": "On Track", "contract": 20.0, "projekt": 0.0, "meeting": 3.0, "off": 8.0}}, {"kw": 23, "Eli": {"messages": 740.0, "aht": 1.53, "active_hours": 29.6, "note": "Public Holiday", "rel": 13.0, "abs": 29.6, "ontrack": "On Track", "contract": 40.0, "projekt": 12.0, "meeting": 5.0, "off": 8.0}, "Jeanine": {"messages": 438.0, "aht": 2.42, "active_hours": 17.52, "note": "Public Holiday", "rel": 18.0, "abs": 17.52, "ontrack": "On Track", "contract": 40.0, "projekt": 8.0, "meeting": 4.0, "off": 8.0}, "Vivien": {"messages": 292.0, "aht": 1.53, "active_hours": 11.68, "note": "Public Holiday", "rel": 8.0, "abs": 11.68, "ontrack": "On Track", "contract": 20.0, "projekt": 0.0, "meeting": 3.0, "off": 8.0}}, {"kw": 24, "Eli": {"messages": 800.0, "aht": 1.7, "active_hours": 32.0, "note": null, "rel": 21.0, "abs": 32.0, "ontrack": "On Track", "contract": 40.0, "projekt": 12.0, "meeting": 5.0, "off": 0.0}, "Jeanine": {"messages": 0.0, "aht": 0.0, "active_hours": 0.0, "note": "Sickness", "rel": -14.0, "abs": 0.0, "ontrack": "On Track", "contract": 40.0, "projekt": 8.0, "meeting": 4.0, "off": 40.0}, "Vivien": {"messages": 338.0, "aht": 1.7, "active_hours": 13.52, "note": null, "rel": 16.0, "abs": 13.52, "ontrack": "Off Track", "contract": 20.0, "projekt": 0.0, "meeting": 3.0, "off": 0.0}}, {"kw": 25, "Eli": {"messages": 550.0, "aht": 1.93, "active_hours": 22.0, "note": null, "rel": 21.0, "abs": 22.0, "ontrack": "On Track", "contract": 40.0, "projekt": 12.0, "meeting": 5.0, "off": 0.0}, "Jeanine": {"messages": 429.0, "aht": 2.37, "active_hours": 17.16, "note": null, "rel": 26.0, "abs": 17.16, "ontrack": "Off Track", "contract": 40.0, "projekt": 8.0, "meeting": 4.0, "off": 0.0}, "Vivien": {"messages": 279.0, "aht": 1.93, "active_hours": 11.16, "note": null, "rel": 16.0, "abs": 11.16, "ontrack": "Off Track", "contract": 20.0, "projekt": 0.0, "meeting": 3.0, "off": 0.0}}, {"kw": 26, "Eli": {"messages": 700.0, "aht": 1.57, "active_hours": 28.0, "note": null, "rel": 21.0, "abs": 28.0, "ontrack": "On Track", "contract": 40.0, "projekt": 12.0, "meeting": 5.0, "off": 0.0}, "Jeanine": {"messages": 531.0, "aht": 2.1, "active_hours": 21.24, "note": null, "rel": 26.0, "abs": 21.24, "ontrack": "Off Track", "contract": 40.0, "projekt": 8.0, "meeting": 4.0, "off": 0.0}, "Vivien": {"messages": 340.0, "aht": 1.57, "active_hours": 13.6, "note": null, "rel": 16.0, "abs": 13.6, "ontrack": "Off Track", "contract": 20.0, "projekt": 0.0, "meeting": 3.0, "off": 0.0}}, {"kw": 27, "Eli": {"messages": 150.0, "aht": 1.82, "active_hours": 6.0, "note": "Holiday", "rel": -11.0, "abs": 6.0, "ontrack": "On Track", "contract": 40.0, "projekt": 12.0, "meeting": 5.0, "off": 32.0}, "Jeanine": {"messages": 1239.0, "aht": 2.16, "active_hours": 49.56, "note": null, "rel": 26.0, "abs": 49.56, "ontrack": "On Track", "contract": 40.0, "projekt": 8.0, "meeting": 4.0, "off": 0.0}, "Vivien": {"messages": 380.0, "aht": 1.82, "active_hours": 15.2, "note": null, "rel": 16.0, "abs": 15.2, "ontrack": "On Track", "contract": 20.0, "projekt": 0.0, "meeting": 3.0, "off": 0.0}}, {"kw": 28, "Eli": {"messages": 370.0, "aht": null, "active_hours": 14.8, "note": "Holiday", "rel": 5.0, "abs": 14.8, "ontrack": "On Track", "contract": 40.0, "projekt": 12.0, "meeting": 5.0, "off": 16.0}, "Jeanine": {"messages": 523.0, "aht": null, "active_hours": 20.92, "note": null, "rel": 26.0, "abs": 20.92, "ontrack": "Off Track", "contract": 40.0, "projekt": 8.0, "meeting": 4.0, "off": 0.0}, "Vivien": {"messages": 338.0, "aht": null, "active_hours": 13.52, "note": null, "rel": 16.0, "abs": 13.52, "ontrack": "Off Track", "contract": 20.0, "projekt": 0.0, "meeting": 3.0, "off": 0.0}}, {"kw": 29, "Eli": {"messages": 500.0, "aht": null, "active_hours": 20.0, "note": null, "rel": 21.0, "abs": 20.0, "ontrack": "On Track", "contract": 40.0, "projekt": 12.0, "meeting": 5.0, "off": 0.0}, "Jeanine": {"messages": 396.0, "aht": null, "active_hours": 15.84, "note": null, "rel": 26.0, "abs": 15.84, "ontrack": "Off Track", "contract": 40.0, "projekt": 8.0, "meeting": 4.0, "off": 0.0}, "Vivien": {"messages": 220.0, "aht": null, "active_hours": 8.8, "note": "University", "rel": 11.0, "abs": 8.8, "ontrack": "Off Track", "contract": 20.0, "projekt": 0.0, "meeting": 3.0, "off": 5.0}}, {"kw": 30, "Eli": {"messages": 680.0, "aht": null, "active_hours": 27.2, "note": null, "rel": 21.0, "abs": 27.2, "ontrack": "On Track", "contract": 40.0, "projekt": 12.0, "meeting": 5.0, "off": 0.0}, "Jeanine": {"messages": 324.0, "aht": null, "active_hours": 12.96, "note": "Sickness", "rel": 18.0, "abs": 12.96, "ontrack": "Off Track", "contract": 40.0, "projekt": 8.0, "meeting": 4.0, "off": 8.0}, "Vivien": {"messages": 442.0, "aht": null, "active_hours": 17.68, "note": null, "rel": 16.0, "abs": 17.68, "ontrack": "On Track", "contract": 20.0, "projekt": 0.0, "meeting": 3.0, "off": null}}, {"kw": 31, "Eli": {"messages": 450.0, "aht": null, "active_hours": 18.0, "note": "Sickness", "rel": 13.0, "abs": 18.0, "ontrack": "On Track", "contract": 40.0, "projekt": 12.0, "meeting": 5.0, "off": 8.0}, "Jeanine": {"messages": 423.0, "aht": null, "active_hours": 16.92, "note": "Doc.", "rel": 22.0, "abs": 16.92, "ontrack": "Off Track", "contract": 40.0, "projekt": 8.0, "meeting": 4.0, "off": 4.0}, "Vivien": {"messages": 294.0, "aht": null, "active_hours": 11.76, "note": null, "rel": 16.0, "abs": 11.76, "ontrack": "Off Track", "contract": 20.0, "projekt": 0.0, "meeting": 3.0, "off": null}}, {"kw": 32, "Eli": {"messages": 850.0, "aht": null, "active_hours": 34.0, "note": null, "rel": 21.0, "abs": 34.0, "ontrack": "On Track", "contract": 40.0, "projekt": 12.0, "meeting": 5.0, "off": 0.0}, "Jeanine": {"messages": 712.0, "aht": null, "active_hours": 28.48, "note": null, "rel": 22.0, "abs": 28.48, "ontrack": "On Track", "contract": 40.0, "projekt": 8.0, "meeting": 4.0, "off": 4.0}, "Vivien": {"messages": 284.0, "aht": null, "active_hours": 11.36, "note": "University", "rel": 14.0, "abs": 11.36, "ontrack": "Off Track", "contract": 20.0, "projekt": 0.0, "meeting": 3.0, "off": 2.0}}, {"kw": 33, "Eli": {"messages": 450.0, "aht": null, "active_hours": 18.0, "note": "Sickness", "rel": 13.0, "abs": 18.0, "ontrack": "On Track", "contract": 40.0, "projekt": 12.0, "meeting": 5.0, "off": 8.0}, "Jeanine": {"messages": 317.0, "aht": null, "active_hours": 12.68, "note": null, "rel": 26.0, "abs": 12.68, "ontrack": "Off Track", "contract": 40.0, "projekt": 8.0, "meeting": 4.0, "off": 0.0}, "Vivien": {"messages": 450.0, "aht": null, "active_hours": 18.0, "note": null, "rel": 16.0, "abs": 18.0, "ontrack": "On Track", "contract": 20.0, "projekt": 0.0, "meeting": 3.0, "off": null}}, {"kw": 34, "Eli": {"messages": 632.0, "aht": null, "active_hours": 25.28, "note": "Team Event", "rel": 9.0, "abs": 25.28, "ontrack": "On Track", "contract": 40.0, "projekt": 12.0, "meeting": 5.0, "off": 12.0}, "Jeanine": {"messages": 320.0, "aht": null, "active_hours": 12.8, "note": "Team Event", "rel": 14.0, "abs": 12.8, "ontrack": "On Track", "contract": 40.0, "projekt": 8.0, "meeting": 4.0, "off": 12.0}, "Vivien": {"messages": 222.0, "aht": null, "active_hours": 8.88, "note": "Team Event", "rel": 8.0, "abs": 8.88, "ontrack": "On Track", "contract": 20.0, "projekt": 0.0, "meeting": 3.0, "off": 8.0}}, {"kw": 35, "Eli": {"messages": 670.0, "aht": null, "active_hours": 26.8, "note": null, "rel": 21.0, "abs": 26.8, "ontrack": "On Track", "contract": 40.0, "projekt": 12.0, "meeting": 5.0, "off": null}, "Jeanine": {"messages": 533.0, "aht": null, "active_hours": 21.32, "note": "Doc.", "rel": 23.5, "abs": 21.32, "ontrack": "Off Track", "contract": 40.0, "projekt": 8.0, "meeting": 4.0, "off": 2.5}, "Vivien": {"messages": 400.0, "aht": null, "active_hours": 16.0, "note": null, "rel": 16.0, "abs": 16.0, "ontrack": "On Track", "contract": 20.0, "projekt": 0.0, "meeting": 3.0, "off": null}}, {"kw": 36, "Eli": {"messages": 500.0, "aht": null, "active_hours": 20.0, "note": null, "rel": 21.0, "abs": 20.0, "ontrack": "On Track", "contract": 40.0, "projekt": 12.0, "meeting": 5.0, "off": null}, "Jeanine": {"messages": 387.0, "aht": null, "active_hours": 15.48, "note": null, "rel": 26.0, "abs": 15.48, "ontrack": "Off Track", "contract": 40.0, "projekt": 8.0, "meeting": 4.0, "off": null}, "Vivien": {"messages": 191.0, "aht": null, "active_hours": 7.64, "note": "Holiday", "rel": 6.0, "abs": 7.64, "ontrack": "On Track", "contract": 20.0, "projekt": 0.0, "meeting": 3.0, "off": 10.0}}], "refunds": [{"kw": 14, "total": 1036.0, "refund_tickets": 329.0, "positive": 41.0, "negative": 288.0, "decline_rate": 0.8753799392, "share": 0.3175675676, "net": 9285.12, "gross": 11047.68}, {"kw": 15, "total": 1054.0, "refund_tickets": 337.0, "positive": 41.0, "negative": 296.0, "decline_rate": 0.8783382789, "share": 0.3197343454, "net": 9543.04, "gross": 11354.56}, {"kw": 16, "total": 1002.0, "refund_tickets": 374.0, "positive": 40.0, "negative": 334.0, "decline_rate": 0.8930481283, "share": 0.373253493, "net": 10768.16, "gross": 12812.24}, {"kw": 17, "total": 1090.0, "refund_tickets": 380.0, "positive": 45.0, "negative": 335.0, "decline_rate": 0.8815789474, "share": 0.3486238532, "net": 10800.4, "gross": 12850.6}, {"kw": 18, "total": 961.0, "refund_tickets": 321.0, "positive": 28.0, "negative": 293.0, "decline_rate": 0.9127725857, "share": 0.3340270552, "net": 9446.32, "gross": 11239.48}, {"kw": 19, "total": 975.0, "refund_tickets": 350.0, "positive": 34.0, "negative": 316.0, "decline_rate": 0.9028571429, "share": 0.358974359, "net": 10187.84, "gross": 12121.76}, {"kw": 20, "total": 843.0, "refund_tickets": 304.0, "positive": 34.0, "negative": 270.0, "decline_rate": 0.8881578947, "share": 0.3606168446, "net": 8704.8, "gross": 10357.2}, {"kw": 21, "total": 823.0, "refund_tickets": 306.0, "positive": 34.0, "negative": 272.0, "decline_rate": 0.8888888889, "share": 0.3718104496, "net": 8769.28, "gross": 10433.92}, {"kw": 22, "total": 1007.0, "refund_tickets": 357.0, "positive": 36.0, "negative": 321.0, "decline_rate": 0.8991596639, "share": 0.3545183714, "net": 10349.04, "gross": 12313.56}, {"kw": 23, "total": 1021.0, "refund_tickets": 395.0, "positive": 36.0, "negative": 359.0, "decline_rate": 0.9088607595, "share": 0.3868756121, "net": 11574.16, "gross": 13771.24}, {"kw": 24, "total": 963.0, "refund_tickets": 453.0, "positive": 41.0, "negative": 412.0, "decline_rate": 0.9094922737, "share": 0.4704049844, "net": 13282.88, "gross": 15804.32}, {"kw": 25, "total": 1008.0, "refund_tickets": 408.0, "positive": 27.0, "negative": 381.0, "decline_rate": 0.9338235294, "share": 0.4047619048, "net": 12283.44, "gross": 14615.16}, {"kw": 26, "total": 1033.0, "refund_tickets": 418.0, "positive": 35.0, "negative": 383.0, "decline_rate": 0.9162679426, "share": 0.4046466602, "net": 12347.92, "gross": 14691.88}, {"kw": 27, "total": 1133.0, "refund_tickets": 464.0, "positive": 38.0, "negative": 426.0, "decline_rate": 0.9181034483, "share": 0.4095322154, "net": 13734.24, "gross": 16341.36}, {"kw": 28, "total": 830.0, "refund_tickets": 305.0, "positive": 32.0, "negative": 273.0, "decline_rate": 0.8950819672, "share": 0.3674698795, "net": 8801.52, "gross": 10472.28}, {"kw": 29, "total": 849.0, "refund_tickets": 250.0, "positive": 23.0, "negative": 227.0, "decline_rate": 0.908, "share": 0.2944640754, "net": 7318.48, "gross": 8707.72}, {"kw": 30, "total": 958.0, "refund_tickets": 305.0, "positive": 33.0, "negative": 272.0, "decline_rate": 0.8918032787, "share": 0.3183716075, "net": 8769.28, "gross": 10433.92}, {"kw": 31, "total": 854.0, "refund_tickets": 259.0, "positive": 25.0, "negative": 234.0, "decline_rate": 0.9034749035, "share": 0.3032786885, "net": 7544.16, "gross": 8976.24}, {"kw": 32, "total": 1090.0, "refund_tickets": 155.0, "positive": 22.0, "negative": 133.0, "decline_rate": 0.8580645161, "share": 0.1422018349, "net": 4287.92, "gross": 5101.88}, {"kw": 33, "total": 800.0, "refund_tickets": 227.0, "positive": 16.0, "negative": 211.0, "decline_rate": 0.9295154185, "share": 0.28375, "net": 6802.64, "gross": 8093.96}, {"kw": 34, "total": 992.0, "refund_tickets": 272.0, "positive": 20.0, "negative": 252.0, "decline_rate": 0.9264705882, "share": 0.2741935484, "net": 8124.48, "gross": 9666.72}, {"kw": 35, "total": 977.0, "refund_tickets": 308.0, "positive": 21.0, "negative": 287.0, "decline_rate": 0.9318181818, "share": 0.3152507677, "net": 9252.88, "gross": 11009.32}, {"kw": 36, "total": 845.0, "refund_tickets": 292.0, "positive": 28.0, "negative": 264.0, "decline_rate": 0.904109589, "share": 0.3455621302, "net": 8511.36, "gross": 10127.04}], "costs": [{"month": "Januar", "total_cost": null, "tickets": 7140.0, "cpt": 3.026880112, "tickets_hs": 4767.0, "tickets_cb": 2373.0, "moinai_fee": 2000.0}, {"month": "Februar", "total_cost": null, "tickets": 7086.0, "cpt": 3.057352526, "tickets_hs": 4896.0, "tickets_cb": 2190.0, "moinai_fee": 2000.0}, {"month": "M\u00e4rz", "total_cost": null, "tickets": 9707.0, "cpt": 2.309801174, "tickets_hs": 5727.0, "tickets_cb": 3980.0, "moinai_fee": 2000.0}, {"month": "April", "total_cost": null, "tickets": 7679.0, "cpt": 2.446180492, "tickets_hs": 4467.0, "tickets_cb": 3212.0, "moinai_fee": 2000.0}, {"month": "Mai", "total_cost": null, "tickets": 6566.0, "cpt": 2.81039537, "tickets_hs": 3989.0, "tickets_cb": 2577.0, "moinai_fee": 2000.0}, {"month": "Juni", "total_cost": null, "tickets": 7049.0, "cpt": 2.519506313, "tickets_hs": 4398.0, "tickets_cb": 2651.0, "moinai_fee": 2000.0}, {"month": "Juli", "total_cost": null, "tickets": 6193.0, "cpt": 2.867753916, "tickets_hs": 3989.0, "tickets_cb": 2204.0, "moinai_fee": 2000.0}, {"month": "August", "total_cost": null, "tickets": 6034.0, "cpt": 3.085846868, "tickets_hs": 4134.0, "tickets_cb": 1900.0, "moinai_fee": 2000.0}], "keymetrics": {"cur": {"month": "August", "tickets_hs": 4134.0, "tickets_cb": 1900.0, "tickets_total": 6034.0, "mtfr": 14.5, "csat": 0.5625, "auto_all": 0.181368738325, "savings_rdr": 28467.92, "cpt": 3.085846868, "aht": null}, "prev": {"month": "Juli", "tickets_hs": 3989.0, "tickets_cb": 2204.0, "tickets_total": 6193.0, "mtfr": 12.279999999999998, "csat": 0.47000000000000003, "auto_all": 0.21907496648000002, "savings_rdr": 46167.68000000001, "cpt": 2.867753916, "aht": 2.058134539287733}, "prev_month": "Juli"}};
-const META = {"source": "kpi.xlsx", "updated": "10.09.2026", "public": true};
-const REPORTS = [{"label": "August 2026", "key": "2026-08", "pptx": "https://drive.google.com/uc?export=download&id=15L5Udm54mTiFz6PLDEFfL0TbUMZnLS6n"}, {"label": "Juli 2026", "key": "2026-07", "pdf": "https://drive.google.com/uc?export=download&id=1F_X9ns1b4cNRoYEC_DI5CFmwTwiQ3rdy", "pptx": "https://drive.google.com/uc?export=download&id=178CqVS8RZPgiTFINCshrafp5eGu9x1bN"}, {"label": "Juni 2026", "key": "2026-06", "pptx": "https://drive.google.com/uc?export=download&id=1wvSIxL8WNl33ck68jjyMoIkaBQcYODMu"}];
+const DATA = __DATA__;
+const META = __META__;
+const REPORTS = __REPORTS__;
 
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const fmtN = v => v==null?'–':Math.round(v).toLocaleString('de-DE');
@@ -1407,3 +1661,36 @@ refreshLive(); // beim Öffnen automatisch aktuelle Zahlen laden
 </script>
 </body>
 </html>
+"""
+
+
+def main():
+    xlsx, out = sys.argv[1], sys.argv[2]
+    public = '--public' in sys.argv[3:]
+    data = extract(xlsx)
+    if public:
+        # Vertrauliche Kostendaten aus der geteilten Version entfernen
+        for c in data['costs']:
+            c['total_cost'] = None
+    import os
+    meta = {'source': os.path.basename(xlsx),
+            'updated': date.today().strftime('%d.%m.%Y'),
+            'public': public}
+    reports = []
+    mf = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'reports_manifest.json')
+    try:
+        with open(mf) as fr:
+            reports = json.load(fr)
+    except (FileNotFoundError, ValueError):
+        reports = []
+    html = HTML_TEMPLATE.replace('__DATA__', json.dumps(data)) \
+                        .replace('__META__', json.dumps(meta)) \
+                        .replace('__REPORTS__', json.dumps(reports))
+    with open(out, 'w') as f:
+        f.write(html)
+    print(f'OK: {out} geschrieben ({len(html)} Bytes), '
+          f'KW {data["hubspot"][0]["kw"]}–{data["hubspot"][-1]["kw"]}')
+
+
+if __name__ == '__main__':
+    main()
