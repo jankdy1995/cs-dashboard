@@ -55,13 +55,46 @@ def extract(path):
         'mtfr': num(r[6]), 'msg_per_ticket': num(r[7]),
     } for r in hs]
 
-    ma = rows(sheet_like('moinai', 'chatbot'), maxcol=11)
+    # ChatBot-Tab: Spalten namensbasiert aus der Sub-Header-Zeile (Zeile 3)
+    # auflösen, damit neue/verschobene Spalten (z. B. Live Chat, Email) den
+    # Build nicht mehr brechen.
+    cb_sheet = sheet_like('moinai', 'chatbot')
+    cb_hdr = [str(c.value).lower() if c.value is not None else ''
+              for c in wb[cb_sheet][3]]
+
+    def cbcol(*needles, excl=()):
+        for i, h in enumerate(cb_hdr):
+            if any(nd in h for nd in needles) and not any(e in h for e in excl):
+                return i
+        return None
+
+    cbi = {
+        'conv_hubspot': cbcol('conversations in hubspot'),
+        'conv_chatbot': cbcol('conversations in chatbot'),
+        'conv_total': cbcol('total conversations'),
+        'share_chatbot': cbcol('share chatbot'),
+        'takeovers': cbcol('takeover'),
+        'solved_bot': cbcol('directly solved'),
+        'auto_bot': cbcol('automation rate', excl=('all',)),
+        'auto_all': cbcol('automation rate (all', 'all tickets'),
+        'csat': cbcol('csat'),
+        'cost_per_ticket': cbcol('cost per ticket'),
+        'savings': cbcol('weekly savings', 'savings'),
+    }
+
+    def cbg(r, key):
+        i = cbi[key]
+        return num(r[i]) if i is not None and i < len(r) else None
+
+    ma = rows(cb_sheet, maxcol=25)
     d['moinai'] = [{
-        'kw': int(r[0]), 'conv_hubspot': num(r[1]), 'conv_chatbot': num(r[2]),
-        'conv_total': num(r[3]), 'share_chatbot': num(r[4]),
-        'takeovers': num(r[5]), 'solved_bot': num(r[6]),
-        'auto_bot': num(r[7]), 'auto_all': num(r[8]),
-        'cost_per_ticket': num(r[9]), 'savings': num(r[10]),
+        'kw': int(r[0]),
+        'conv_hubspot': cbg(r, 'conv_hubspot'), 'conv_chatbot': cbg(r, 'conv_chatbot'),
+        'conv_total': cbg(r, 'conv_total'), 'share_chatbot': cbg(r, 'share_chatbot'),
+        'takeovers': cbg(r, 'takeovers'), 'solved_bot': cbg(r, 'solved_bot'),
+        'auto_bot': cbg(r, 'auto_bot'), 'auto_all': cbg(r, 'auto_all'),
+        'csat': cbg(r, 'csat'),
+        'cost_per_ticket': cbg(r, 'cost_per_ticket'), 'savings': cbg(r, 'savings'),
     } for r in ma]
 
     # Agents + Spalten dynamisch aus den Kopfzeilen erkennen (Zeile 2 = Agent-
@@ -176,6 +209,27 @@ def extract(path):
             'moinai_fee': num(r[col_fee]) if col_fee is not None else None,
         })
 
+    # Monthly_Summary: Cost per Ticket je Monat (rechteste datierte Spalte je
+    # Monat gewinnt — wie im Report), damit Key-Metrics-CPT auch für Monate
+    # ohne CST_Costs-Zeile (z. B. laufender Monat) gefüllt ist.
+    d['ms_cpt'] = {}
+    ms_name = next((s for s in wb.sheetnames if 'monthly_summary' in s.lower()), None)
+    if ms_name:
+        ms = wb[ms_name]
+        hdr = list(ms[3])
+        month_cols = [(i, h.value.month) for i, h in enumerate(hdr)
+                      if hasattr(h.value, 'month') and hasattr(h.value, 'year')]
+        cpt_row = None
+        for r in ms.iter_rows(min_row=4, max_row=40):
+            if str(r[0].value or '').strip().lower() == 'cost per ticket':
+                cpt_row = r
+                break
+        if cpt_row is not None:
+            for i, mon in month_cols:      # links→rechts: rechte Spalte gewinnt
+                v = cpt_row[i].value if i < len(cpt_row) else None
+                if isinstance(v, (int, float)) and not isinstance(v, bool):
+                    d['ms_cpt'][mon] = float(v)
+
     d['keymetrics'] = build_keymetrics(d)
     return d
 
@@ -244,7 +298,8 @@ def build_keymetrics(d):
             'csat': avg([r['csat'] for r in hsr]),
             'auto_all': avg([r['auto_all'] for r in mar]),
             'savings_rdr': total([r['net'] for r in rfr]),
-            'cpt': c['cpt'] if c else None,
+            'cpt': (c['cpt'] if (c and c['cpt'] is not None)
+                    else d.get('ms_cpt', {}).get(m)),
             'aht': wsum / wmsg if wmsg else None,
         }
 
@@ -467,7 +522,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   <div class="section-title" style="--acc:var(--s1)">🎫 Tickets &amp; Support (HubSpot)<span class="rule"></span></div>
   <div class="grid" id="sec-hubspot"></div>
 
-  <div class="section-title" style="--acc:var(--s2)">🤖 Chatbot (MoinAI)<span class="rule"></span></div>
+  <div class="section-title" style="--acc:var(--s2)">🤖 Chatbot<span class="rule"></span></div>
   <div class="grid" id="sec-moinai"></div>
 
   <div class="section-title" style="--acc:var(--s5)">👥 Team Performance<span class="rule"></span></div>
@@ -763,16 +818,8 @@ function lineChart(el,{labels,series,yFmt,labelSeries,area,target,trend}){
       c.setAttribute('fill',s.color);c.setAttribute('stroke',css('--surface-1'));
       c.setAttribute('stroke-width',2);svg.append(c);});
   });
-  // Werte an jeder KW: bei einer Serie diese, bei mehreren die Hauptserie
-  const li=labelSeries!=null?labelSeries:0;
-  const ls=series[Math.min(li,series.length-1)];
-  ls.values.forEach((v,i)=>{
-    if(v==null)return;
-    const anchor=i===0?'start':(i===labels.length-1?'end':'middle');
-    const dx=i===0?-4:(i===labels.length-1?4:0);
-    text(svg,x(i)+dx,y(v)-9,(ls.fmt||yFmt)(v),anchor,10,css('--ink-1'))
-      .setAttribute('font-weight','600');
-  });
+  // Werte werden NICHT mehr dauerhaft angezeigt (vermeidet Überlappen bei vielen
+  // Punkten) — sie erscheinen nur beim Hover im Tooltip.
   const tt=tooltipFor(el);
   svg.addEventListener('pointermove',e=>{
     const r=svg.getBoundingClientRect(),sx=W/r.width;
@@ -883,9 +930,7 @@ function barChart(el,{labels,series,yFmt,totalLabelLast,target}){
       svg.append(r);
       y0=top;
     });
-    // Gesamtwert über jeder Säule
-    text(svg,cx,y0-6,(series.length===1?(series[0].fmt||yFmt):fmtN)(totals[i]),
-      'middle',10,css('--ink-1')).setAttribute('font-weight','600');
+    // Werte nur beim Hover (kein dauerhaftes Label über den Säulen).
     // Hit target: ganze Band-Spalte
     const hit=document.createElementNS(svg.namespaceURI,'rect');
     hit.setAttribute('x',M.l+band*i);hit.setAttribute('y',M.t);
@@ -953,9 +998,32 @@ function buildLiveData(hsT,maT,tmT,rfT){
   const hs=dataRows(parseCSV(hsT)).map(r=>({kw:Math.round(n(r[0])),created:n(r[1]),
     user:n(r[2]),partner:n(r[3]),messages:n(r[4]),csat:n(r[5]),mtfr:n(r[6]),
     msg_per_ticket:n(r[7])}));
-  const ma=dataRows(parseCSV(maT)).map(r=>({kw:Math.round(n(r[0])),conv_hubspot:n(r[1]),
-    conv_chatbot:n(r[2]),conv_total:n(r[3]),share_chatbot:n(r[4]),takeovers:n(r[5]),
-    solved_bot:n(r[6]),auto_bot:n(r[7]),auto_all:n(r[8]),savings:n(r[10])}));
+  // ChatBot-Spalten namensbasiert aus der Sub-Header-Zeile (Zeile 3) auflösen,
+  // damit verschobene/neue Spalten (Live Chat, Email) nichts brechen.
+  const maRows=parseCSV(maT);
+  const maHdr=(maRows[2]||[]).map(s=>String(s||'').toLowerCase());
+  const mcol=(needles,excl)=>{
+    for(let i=0;i<maHdr.length;i++){const h=maHdr[i];
+      if(needles.some(nd=>h.includes(nd))&&!(excl||[]).some(e=>h.includes(e)))return i;}
+    return null;};
+  const MC={conv_hubspot:mcol(['conversations in hubspot']),
+    conv_chatbot:mcol(['conversations in chatbot']),
+    conv_total:mcol(['total conversations']),
+    share_chatbot:mcol(['share chatbot']),
+    takeovers:mcol(['takeover']),
+    solved_bot:mcol(['directly solved']),
+    auto_bot:mcol(['automation rate'],['all']),
+    auto_all:mcol(['automation rate (all','all tickets']),
+    csat:mcol(['csat']),
+    cost_per_ticket:mcol(['cost per ticket']),
+    savings:mcol(['weekly savings','savings'])};
+  const mc=(r,k)=>MC[k]==null?null:n(r[MC[k]]);
+  const ma=dataRows(maRows).map(r=>({kw:Math.round(n(r[0])),
+    conv_hubspot:mc(r,'conv_hubspot'),conv_chatbot:mc(r,'conv_chatbot'),
+    conv_total:mc(r,'conv_total'),share_chatbot:mc(r,'share_chatbot'),
+    takeovers:mc(r,'takeovers'),solved_bot:mc(r,'solved_bot'),
+    auto_bot:mc(r,'auto_bot'),auto_all:mc(r,'auto_all'),csat:mc(r,'csat'),
+    cost_per_ticket:mc(r,'cost_per_ticket'),savings:mc(r,'savings')}));
   const txt=v=>{v=(v||'').trim();return (v===''||v==='/')?null:v;};
   // Team: Agents + Spalten dynamisch aus den Kopfzeilen erkennen (Zeile 2/3)
   const rawTm=parseCSV(tmT);
@@ -992,7 +1060,7 @@ function buildLiveData(hsT,maT,tmT,rfT){
     refund_tickets:n(r[2]),positive:n(r[3]),negative:n(r[4]),decline_rate:n(r[5]),
     share:n(r[6]),net:n(r[7]),gross:n(r[8])}));
   if(!hs.length)throw new Error('keine HubSpot-Daten');
-  return {hubspot:hs,moinai:ma,team:tm,refunds:rf,costs:DATA.costs,team_agents:teamAgents,live:true};
+  return {hubspot:hs,moinai:ma,team:tm,refunds:rf,costs:DATA.costs,ms_cpt:DATA.ms_cpt,team_agents:teamAgents,live:true};
 }
 async function fetchLive(){
   const get=u=>fetch(u+'&_='+Date.now(),{cache:'no-store'})
@@ -1031,6 +1099,7 @@ function computeKeymetrics(D,forceMonth){
   const avg=v=>{v=v.filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b)/v.length:null;};
   const sum=v=>{v=v.filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b):null;};
   const costsBy={};(D.costs||[]).forEach(c=>costsBy[c.month]=c);
+  const msCpt=D.ms_cpt||{};
   function km(m){
     if(m<1)return null;
     const name=MONTHS_DE[m],hsr=ghs[m]||[],mar=gma[m]||[],rfr=grf[m]||[],tmr=gtm[m]||[];
@@ -1047,7 +1116,7 @@ function computeKeymetrics(D,forceMonth){
       tickets_total:(th!=null||tc!=null)?((th||0)+(tc||0)):null,
       mtfr:avg(hsr.map(r=>r.mtfr)),csat:avg(hsr.map(r=>r.csat)),
       auto_all:avg(mar.map(r=>r.auto_all)),savings_rdr:sum(rfr.map(r=>r.net)),
-      cpt:c?c.cpt:null,aht:wm?ws/wm:null};
+      cpt:(c&&c.cpt!=null)?c.cpt:(msCpt[m]!=null?msCpt[m]:null),aht:wm?ws/wm:null};
   }
   return {cur:km(sel),prev:km(sel-1),prev_month:sel>1?MONTHS_DE[sel-1]:null};
 }
@@ -1269,9 +1338,6 @@ if(KM&&KM.cur){
   t({label:'Cost per Ticket',value:fmtEuro2(k.cpt),
      delta:rel(k.cpt,p.cpt),goodWhen:'down',deltaLabel:vsLbl,
      sub:'inkl. Chatbot-Tickets',statusKey:'cpt',statusVal:k.cpt});
-  t({label:'Average Handling Time',value:fmtMin(k.aht),
-     delta:rel(k.aht,p.aht),goodWhen:'down',deltaLabel:vsLbl,
-     sub:'Ø gewichtet über alle Agents',statusKey:'aht',statusVal:k.aht});
 }
 
 
@@ -1280,13 +1346,14 @@ document.getElementById('week-prefix').textContent=(selMonth==='')?'Letzte Woche
 const tiles=document.getElementById('tiles');
 tiles.append(
   tile('Erstellte Tickets (KW '+cur.kw+')',fmtN(cur.created),rel(cur.created,prev.created),'down'),
-  tile('Ticketvolumen gesamt (KW '+D.hubspot[0].kw+'–'+cur.kw+')',fmtN(sumv(D.hubspot.map(r=>r.created))),null),
-  tile('CSAT',fmtP(cur.csat),rel(cur.csat,prev.csat),'up','csat',cur.csat),
+  tile('CSAT (Human Agents)',fmtP(cur.csat),rel(cur.csat,prev.csat),'up','csat',cur.csat),
+  tile('CSAT (Chatbot)',fmtP(maC.csat),rel(maC.csat,maP.csat),'up',null,null,
+    'CSAT des Chatbots der aktuellen KW. Quelle: Sheet ChatBot_KPIs, Spalte \'CSAT\'.'),
   tile('Median First Reply Time',fmtH(cur.mtfr),rel(cur.mtfr,prev.mtfr),'down','mtfr',cur.mtfr),
   tile('Automation Rate (alle Tickets)',fmtP(maC.auto_all),rel(maC.auto_all,maP.auto_all),'up','auto_all',maC.auto_all),
   tile('Refund Decline Rate',fmtP(rfC.decline_rate),rel(rfC.decline_rate,rfP.decline_rate),'up','decline_rate',rfC.decline_rate),
-  tile('Weekly Savings (MoinAI)',fmtEuro(maC.savings),rel(maC.savings,maP.savings),'up',null,null,
-    'Berechnung: Direkt vom Chatbot gelöste Anfragen × Kosten pro Chatbot-Konversation × 7. Kosten pro Konversation = 2.000 € MoinAI-Flat-Fee ÷ Chatbot-Konversationen der Woche. Quelle: Sheet MoinAI_KPIs, Spalte \'Weekly Savings\'.'),
+  tile('Weekly Savings (Chatbot)',fmtEuro(maC.savings),rel(maC.savings,maP.savings),'up',null,null,
+    'Berechnung: Direkt vom Chatbot gelöste Anfragen × Kosten pro Chatbot-Konversation × 7. Kosten pro Konversation = 2.000 € Chatbot-Flat-Fee ÷ Chatbot-Konversationen der Woche. Quelle: Sheet ChatBot_KPIs, Spalte \'Weekly Savings (€)\'.'),
   tile('Net Contribution (Refunds)',fmtEuro(rfC.net),rel(rfC.net,rfP.net),'up'),
   tile('Messages per Ticket',fmtP(cur.msg_per_ticket),
     rel(cur.msg_per_ticket,prev.msg_per_ticket),'up')
