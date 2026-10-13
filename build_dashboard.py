@@ -472,17 +472,50 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     border-radius:6px;background:var(--surface-1);}
   .chart-stat b{color:var(--ink-1);font-weight:650;}
   .report-box{background:var(--surface-1);border:1px solid var(--border);
-    border-radius:10px;padding:18px 20px;}
-  .report-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px;}
-  .report-row label{font-size:13px;color:var(--ink-2);}
-  .report-dl{display:inline-flex;align-items:center;gap:7px;
-    background:var(--surface-1);border:1px solid var(--border);border-radius:7px;
-    color:var(--ink-1);font-size:12.5px;font-weight:600;padding:7px 14px;
-    text-decoration:none;cursor:pointer;font-family:inherit;transition:.15s;}
-  .report-dl:hover{border-color:var(--baseline);}
-  .report-dl.pdf{color:var(--s8);}
-  .report-dl.pptx{color:var(--s3);}
-  .report-note{color:var(--ink-3);font-size:12px;margin-top:11px;line-height:1.5;}
+    border-left:3px solid var(--s2);border-radius:12px;padding:20px 22px;}
+  .report-panel{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;}
+  .rc-field{display:flex;flex-direction:column;gap:6px;}
+  .rc-lab{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;
+    color:var(--ink-3);font-weight:700;padding-left:2px;}
+  .rc-sel{background:var(--surface-1);border:1px solid var(--border);border-radius:9px;
+    color:var(--ink-1);font-size:13.5px;font-weight:600;padding:9px 13px;min-width:150px;
+    cursor:pointer;font-family:inherit;transition:.15s;}
+  .rc-sel:hover{border-color:var(--baseline);}
+  .rc-sel:disabled{opacity:.55;cursor:default;}
+  .report-btn{display:inline-flex;align-items:center;gap:9px;align-self:flex-end;
+    background:var(--s2);color:#08120c;font-size:13.5px;font-weight:700;
+    padding:10px 22px;border-radius:9px;text-decoration:none;cursor:pointer;
+    border:1px solid transparent;transition:transform .12s,filter .12s;}
+  .report-btn:hover{filter:brightness(1.08);transform:translateY(-1px);}
+  .report-btn .dl-ic{font-size:15px;line-height:1;}
+  .report-btn.disabled{background:var(--surface-1);color:var(--ink-3);
+    border-color:var(--border);cursor:default;pointer-events:none;}
+  .report-btn.ghost{background:transparent;color:var(--ink-1);border-color:var(--border);}
+  .report-btn.ghost:hover{border-color:var(--s2);color:var(--s2);}
+  .report-btn.ghost.disabled{color:var(--ink-3);border-color:var(--border);}
+  .report-note{color:var(--ink-3);font-size:12px;margin-top:15px;line-height:1.5;}
+  .report-empty{color:var(--ink-3);font-size:13px;line-height:1.5;}
+  .pv-ov{position:fixed;inset:0;z-index:120;display:none;align-items:center;
+    justify-content:center;background:rgba(6,10,14,.72);backdrop-filter:blur(3px);
+    padding:24px;}
+  .pv-ov.open{display:flex;}
+  .pv-box{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;
+    width:min(920px,100%);height:min(88vh,900px);display:flex;flex-direction:column;
+    overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.45);}
+  .pv-head{display:flex;align-items:center;gap:12px;padding:13px 18px;
+    border-bottom:1px solid var(--border);}
+  .pv-title{font-size:14px;font-weight:700;color:var(--ink-1);}
+  .pv-actions{margin-left:auto;display:flex;align-items:center;gap:10px;}
+  .pv-open{font-size:12.5px;font-weight:600;color:var(--ink-2);text-decoration:none;
+    border:1px solid var(--border);border-radius:8px;padding:6px 12px;transition:.15s;}
+  .pv-open:hover{border-color:var(--s2);color:var(--s2);}
+  .pv-x{background:transparent;border:none;color:var(--ink-2);font-size:22px;line-height:1;
+    cursor:pointer;padding:2px 6px;border-radius:8px;transition:.15s;}
+  .pv-x:hover{color:var(--ink-1);background:var(--surface-2);}
+  .pv-body{flex:1;background:var(--surface-2);position:relative;}
+  .pv-body iframe{width:100%;height:100%;border:0;}
+  .pv-hint{color:var(--ink-3);font-size:12px;padding:10px 18px;border-top:1px solid var(--border);
+    line-height:1.5;}
 </style>
 </head>
 <body>
@@ -538,6 +571,20 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   <div id="sec-reports" class="report-box"></div>
 
   <div class="foot" id="footline"></div>
+</div>
+
+<div class="pv-ov" id="pvOv" role="dialog" aria-modal="true" aria-label="Report-Vorschau">
+  <div class="pv-box">
+    <div class="pv-head">
+      <span class="pv-title" id="pvTitle">Vorschau</span>
+      <div class="pv-actions">
+        <a class="pv-open" id="pvOpen" target="_blank" rel="noopener">In Drive öffnen ↗</a>
+        <button class="pv-x" id="pvX" aria-label="Schließen">×</button>
+      </div>
+    </div>
+    <div class="pv-body"><iframe id="pvFrame" title="Report-Vorschau"></iframe></div>
+    <div class="pv-hint">Vorschau über Google Drive · Anzeige nur mit NeoTaste-Google-Login (@neotaste.app).</div>
+  </div>
 </div>
 
 <script>
@@ -1659,28 +1706,86 @@ function renderReports(){
   if(!box)return;
   const list=Array.isArray(REPORTS)?REPORTS:[];
   if(!list.length){
-    box.innerHTML='<div class="report-note">Noch keine Reports hinterlegt. Der erste wird automatisch am 1. des Monats erstellt und hier verlinkt.</div>';
+    box.innerHTML='<div class="report-empty">Noch keine Reports hinterlegt. Sobald ein Report im Drive-Ordner liegt, erscheint er hier zum Download.</div>';
     return;
   }
-  const opts=list.map((r,i)=>'<option value="'+i+'">'+r.label+'</option>').join('');
+  const mopts=list.map((r,i)=>'<option value="'+i+'">'+r.label+'</option>').join('');
   box.innerHTML=
-    '<div class="report-row">'
-    +'<label for="reportSel">Monat</label>'
-    +'<select class="period-sel" id="reportSel">'+opts+'</select>'
-    +'<a class="report-dl pdf" id="reportPdf" target="_blank" rel="noopener">⬇️&nbsp; PDF</a>'
-    +'<a class="report-dl pptx" id="reportPptx" target="_blank" rel="noopener">⬇️&nbsp; PowerPoint</a>'
-    +'</div>'
-    +'<div class="report-note">C-Level-Monatsreport aus den KPI-Daten. Download nur mit NeoTaste-Google-Login (@neotaste.app).</div>';
+    '<div class="report-panel">'
+    + '<div class="rc-field"><span class="rc-lab">Monat</span>'
+    +   '<select class="rc-sel" id="reportSel">'+mopts+'</select></div>'
+    + '<div class="rc-field"><span class="rc-lab">Format</span>'
+    +   '<select class="rc-sel" id="reportFmt"></select></div>'
+    + '<button class="report-btn ghost" id="reportPv" type="button">'
+    +   '<span class="dl-ic">👁</span> Vorschau</button>'
+    + '<a class="report-btn" id="reportDl" target="_blank" rel="noopener">'
+    +   '<span class="dl-ic">⬇</span> Download</a>'
+    + '</div>'
+    + '<div class="report-note">C-Level-Monatsreport aus den KPI-Daten · Vorschau &amp; Download nur mit NeoTaste-Google-Login (@neotaste.app).</div>';
   const sel=document.getElementById('reportSel'),
-        pdf=document.getElementById('reportPdf'),
-        ppt=document.getElementById('reportPptx');
-  function upd(){
-    const r=list[sel.value]||{};
-    if(r.pdf){pdf.href=r.pdf;pdf.style.display='';}else{pdf.style.display='none';}
-    if(r.pptx){ppt.href=r.pptx;ppt.style.display='';}else{ppt.style.display='none';}
+        fmt=document.getElementById('reportFmt'),
+        dl=document.getElementById('reportDl'),
+        pv=document.getElementById('reportPv');
+  function driveId(url){
+    if(!url)return null;
+    let m=url.match(/[?&]id=([^&]+)/); if(m)return m[1];
+    m=url.match(/\/d\/([^/]+)/); if(m)return m[1];
+    return null;
   }
-  sel.addEventListener('change',upd);upd();
+  function formatsFor(r){
+    const a=[]; if(r&&r.pdf)a.push(['pdf','PDF']); if(r&&r.pptx)a.push(['pptx','PowerPoint']);
+    return a;
+  }
+  function updDl(){
+    const r=list[sel.value]||{};
+    const url=r[fmt.value];
+    if(url){dl.href=url;dl.classList.remove('disabled');}
+    else{dl.removeAttribute('href');dl.classList.add('disabled');}
+    // Vorschau nur für PDF
+    const id=driveId(r.pdf);
+    if(id){pv.classList.remove('disabled');pv.disabled=false;
+      pv.title='PDF-Vorschau '+(r.label||'');}
+    else{pv.classList.add('disabled');pv.disabled=true;
+      pv.title='Für diesen Monat liegt keine PDF vor';}
+  }
+  function fillFmt(){
+    const r=list[sel.value]||{};
+    const fs=formatsFor(r);
+    fmt.innerHTML=fs.map(f=>'<option value="'+f[0]+'">'+f[1]+'</option>').join('');
+    fmt.disabled=fs.length<2;
+    updDl();
+  }
+  pv.addEventListener('click',function(){
+    const r=list[sel.value]||{};
+    const id=driveId(r.pdf);
+    if(!id)return;
+    openPreview(id,'PDF-Vorschau · '+(r.label||''));
+  });
+  sel.addEventListener('change',fillFmt);
+  fmt.addEventListener('change',updDl);
+  fillFmt();
 }
+function openPreview(id,title){
+  const ov=document.getElementById('pvOv'),fr=document.getElementById('pvFrame'),
+        tt=document.getElementById('pvTitle'),op=document.getElementById('pvOpen');
+  if(!ov)return;
+  fr.src='https://drive.google.com/file/d/'+id+'/preview';
+  op.href='https://drive.google.com/file/d/'+id+'/view';
+  tt.textContent=title||'Vorschau';
+  ov.classList.add('open');
+}
+function closePreview(){
+  const ov=document.getElementById('pvOv'),fr=document.getElementById('pvFrame');
+  if(!ov)return;
+  ov.classList.remove('open');
+  fr.src='about:blank'; // Laden stoppen
+}
+(function(){
+  const ov=document.getElementById('pvOv'),x=document.getElementById('pvX');
+  if(x)x.addEventListener('click',closePreview);
+  if(ov)ov.addEventListener('click',function(e){if(e.target===ov)closePreview();});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')closePreview();});
+})();
 renderReports();
 renderAll(DATA); // eingebettete Daten sofort zeigen — nie eine leere Seite
 
