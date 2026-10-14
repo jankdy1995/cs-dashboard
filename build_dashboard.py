@@ -230,8 +230,52 @@ def extract(path):
                 if isinstance(v, (int, float)) and not isinstance(v, bool):
                     d['ms_cpt'][mon] = float(v)
 
+    # Top-3-Ticket-Kategorien je Monat (Zeile "Ticket Category" in Monthly_Summary)
+    d['categories'] = extract_categories(ms) if ms_name else []
+
     d['keymetrics'] = build_keymetrics(d)
     return d
+
+
+def parse_categories(text):
+    """'55% Refund, 13% Payment, 8,2% Double Request' -> [{'name','pct'}, ...]."""
+    import re
+    if not isinstance(text, str):
+        return []
+    out = []
+    # Trenner ist Komma + Leerzeichen vor einer Zahl (Dezimalkomma hat kein Leerzeichen)
+    for part in re.split(r',\s+(?=\d)', text.strip()):
+        m = re.match(r'^(\d+(?:[.,]\d+)?)\s*%\s*(.+)$', part.strip())
+        if m:
+            out.append({'name': m.group(2).strip(),
+                        'pct': float(m.group(1).replace(',', '.'))})
+    return out
+
+
+def extract_categories(ms):
+    """Top-3-Ticket-Kategorien je Monat aus Monthly_Summary (Zeile 'Ticket Category').
+    Monatsspalten werden über die Datumszellen der Kopfzeile (Zeile 3) gefunden."""
+    short = ['', 'Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep',
+             'Okt', 'Nov', 'Dez']
+    hdr = list(ms[3])
+    cat_row = None
+    for r in ms.iter_rows(min_row=4, max_row=40):
+        if str(r[0].value or '').strip().lower().startswith('ticket category'):
+            cat_row = r
+            break
+    out = []
+    if cat_row is None:
+        return out
+    for i, h in enumerate(hdr):
+        if not (hasattr(h.value, 'month') and hasattr(h.value, 'year')):
+            continue
+        items = parse_categories(cat_row[i].value if i < len(cat_row) else None)
+        if items:
+            out.append({'year': h.value.year, 'month': h.value.month,
+                        'label': '%s %02d' % (short[h.value.month], h.value.year % 100),
+                        'items': items[:3]})
+    out.sort(key=lambda c: (c['year'], c['month']))
+    return out
 
 
 def build_keymetrics(d):
@@ -466,6 +510,16 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   table.data td{text-align:right;padding:4px 8px;
     border-bottom:1px solid var(--grid);font-variant-numeric:tabular-nums;}
   table.data th:first-child,table.data td:first-child{text-align:left;}
+  table.tp{width:100%;border-collapse:collapse;font-size:12px;margin:4px 0 6px;table-layout:fixed;}
+  table.tp th{color:var(--ink-3);font-weight:500;text-align:left;
+    border-bottom:1px solid var(--grid);padding:4px 6px;}
+  table.tp td{padding:5px 6px;border-bottom:1px solid var(--grid);vertical-align:top;}
+  table.tp th:first-child,table.tp td.m{width:54px;}
+  table.tp td.m{color:var(--ink-2);white-space:nowrap;font-variant-numeric:tabular-nums;}
+  table.tp .nm{display:flex;justify-content:space-between;gap:6px;}
+  table.tp .nm span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  table.tp .nm b{font-weight:650;font-variant-numeric:tabular-nums;flex:none;}
+  table.tp .bar{height:4px;border-radius:2px;margin-top:3px;background:var(--s8);}
   .foot{margin-top:30px;color:var(--ink-3);font-size:12px;}
   .chart-stat{display:inline-block;font-size:11.5px;color:var(--ink-2);
     margin:2px 0 4px;padding:3px 9px;border:1px solid var(--border);
@@ -732,7 +786,8 @@ function chartCard(parent,{title,hint,width,legend,spec,table,hoverInfo,explain,
   if(stat){const sEl=document.createElement('div');sEl.className='chart-stat';sEl.innerHTML=stat;hwrap.append(sEl);}
   const sel=document.createElement('select');sel.className='view-sel';
   sel.title='Darstellung wählen';
-  VIEWS.forEach(([v,lbl])=>{const o=document.createElement('option');
+  const AVAIL=VIEWS.filter(([v])=>!(spec.noPie&&v==='kreis'));
+  AVAIL.forEach(([v,lbl])=>{const o=document.createElement('option');
     o.value=v;o.textContent=lbl;sel.append(o);});
   head.append(hwrap,sel);card.append(head);
   if(explain){
@@ -753,7 +808,7 @@ function chartCard(parent,{title,hint,width,legend,spec,table,hoverInfo,explain,
   // Ansicht aus URL wiederherstellen (teilbare Links)
   const slug='v-'+title.toLowerCase().replace(/[^a-z0-9äöüß]+/g,'-').replace(/^-+|-+$/g,'');
   const fromUrl=new URLSearchParams(location.search).get(slug);
-  let view=VIEWS.some(([v])=>v===fromUrl)?fromUrl:(spec.defaultView||'linie');
+  let view=AVAIL.some(([v])=>v===fromUrl)?fromUrl:(spec.defaultView||'linie');
   sel.value=view;
 
   function setLegend(items){
@@ -792,6 +847,55 @@ function buildTable(el,{cols,rows}){
     r.forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.append(td);});
     t.append(tr);});
   el.append(t);
+}
+/* Top-3 Ticket-Probleme je Monat: cats=[{label,items:[{name,pct}]}], neueste zuletzt */
+function topProblemsCard(parent,cats,nMonths){
+  const card=document.createElement('div');card.className='card';
+  const head=document.createElement('div');head.className='card-head';
+  const hw=document.createElement('div');
+  const h=document.createElement('h3');h.textContent='Top-3 Ticket-Probleme';
+  const p=document.createElement('div');p.className='hint';
+  p.textContent='Häufigste Ticket-Kategorien je Monat · Anteil an allen Tickets';
+  hw.append(h,p);head.append(hw);card.append(head);
+  const list=(cats||[]).filter(c=>c.items&&c.items.length).slice(-nMonths).reverse();
+  if(!list.length){
+    const e=document.createElement('div');e.className='hint';
+    e.textContent='Noch keine Kategorie-Daten im KPI Sheet (Monthly_Summary, Zeile „Ticket Category“).';
+    card.append(e);parent.append(card);return;
+  }
+  const maxPct=Math.max(...list.flatMap(c=>c.items.map(it=>it.pct)));
+  const fmtPct=v=>v.toLocaleString('de-DE',{maximumFractionDigits:1})+' %';
+  const t=document.createElement('table');t.className='tp';
+  const hr=document.createElement('tr');
+  ['Monat','Platz 1','Platz 2','Platz 3'].forEach(txt=>{
+    const th=document.createElement('th');th.textContent=txt;hr.append(th);});
+  t.append(hr);
+  list.forEach(c=>{
+    const tr=document.createElement('tr');
+    const m=document.createElement('td');m.className='m';m.textContent=c.label;tr.append(m);
+    for(let k=0;k<3;k++){
+      const td=document.createElement('td');
+      const it=c.items[k];
+      if(it){
+        td.title=it.name+': '+fmtPct(it.pct);
+        const nm=document.createElement('div');nm.className='nm';
+        const a=document.createElement('span');a.textContent=it.name;
+        const b=document.createElement('b');b.textContent=fmtPct(it.pct);
+        nm.append(a,b);
+        const bar=document.createElement('div');bar.className='bar';
+        bar.style.width=Math.max(4,it.pct/maxPct*100)+'%';
+        bar.style.opacity=[1,.7,.45][k];
+        td.append(nm,bar);
+      }else td.textContent='–';
+      tr.append(td);
+    }
+    t.append(tr);
+  });
+  card.append(t);
+  const note=document.createElement('div');note.className='hint';
+  note.textContent='Quelle: KPI Sheet, Monthly_Summary · letzte '+list.length+' Monate mit Daten';
+  card.append(note);
+  parent.append(card);
 }
 function tooltipFor(chartEl){
   const tt=document.createElement('div');tt.className='tooltip';chartEl.append(tt);
@@ -942,10 +1046,14 @@ function pieChart(el,{labels,series,yFmt}){
 }
 
 /* Bar chart, optionally stacked: series=[{name,color,values,fmt}] */
-function barChart(el,{labels,series,yFmt,totalLabelLast,target}){
+function barChart(el,{labels,series,yFmt,totalLabelLast,target,grouped}){
   const svg=makeSvg();el.append(svg);
   const totals=labels.map((_,i)=>series.reduce((a,s)=>a+(s.values[i]||0),0));
-  let bmax=Math.max(...totals);
+  // grouped: Serien sind verschiedene Sichten auf dieselbe Größe (z. B. Netto/Brutto)
+  // und werden nebeneinander gezeichnet, nie addiert.
+  let bmax=grouped
+    ?Math.max(0,...series.flatMap(s=>labels.map((_,i)=>s.values[i]||0)))
+    :Math.max(...totals);
   if(target!=null)bmax=Math.max(bmax,target*1.08);
   const y=frame(svg,bmax,yFmt);
   if(target!=null){
@@ -959,8 +1067,22 @@ function barChart(el,{labels,series,yFmt,totalLabelLast,target}){
   labels.forEach((lb,i)=>{
     const cx=M.l+band*(i+0.5);
     text(svg,cx,H-M.b+15,lb,'middle');
+    if(grouped){
+      const n=series.length, gw=Math.min(18,band*0.36), gap=3;
+      const x00=cx-(n*gw+(n-1)*gap)/2;
+      series.forEach((s,si)=>{
+        const v=s.values[i]||0, h=(H-M.b)-y(v), yTop=(H-M.b)-h;
+        if(h<=0)return;
+        const x0=x00+si*(gw+gap), rad=Math.min(3,h);
+        const r=document.createElementNS(svg.namespaceURI,'path');
+        r.setAttribute('d',`M${x0},${H-M.b} L${x0},${yTop+rad} Q${x0},${yTop} ${x0+rad},${yTop} `+
+          `L${x0+gw-rad},${yTop} Q${x0+gw},${yTop} ${x0+gw},${yTop+rad} L${x0+gw},${H-M.b} Z`);
+        r.setAttribute('fill',s.color);
+        svg.append(r);
+      });
+    }
     let y0=H-M.b;
-    series.forEach((s,si)=>{
+    (grouped?[]:series).forEach((s,si)=>{
       const v=s.values[i]||0, h=(H-M.b)-y(v);
       const top=y0-h;
       const isTop=si===series.length-1;
@@ -987,7 +1109,7 @@ function barChart(el,{labels,series,yFmt,totalLabelLast,target}){
       const rc=svg.getBoundingClientRect();
       const rows=series.map(s=>({name:s.name,color:s.color,
         value:(s.fmt||yFmt)(s.values[i])}));
-      if(series.length>1)rows.push({name:'Gesamt',color:'transparent',value:yFmt(totals[i])});
+      if(series.length>1&&!grouped)rows.push({name:'Gesamt',color:'transparent',value:yFmt(totals[i])});
       tt.show(e.clientX-rc.left,e.clientY-rc.top,lb,rows);
     });
     hit.addEventListener('pointerleave',()=>tt.hide());
@@ -1107,7 +1229,7 @@ function buildLiveData(hsT,maT,tmT,rfT){
     refund_tickets:n(r[2]),positive:n(r[3]),negative:n(r[4]),decline_rate:n(r[5]),
     share:n(r[6]),net:n(r[7]),gross:n(r[8])}));
   if(!hs.length)throw new Error('keine HubSpot-Daten');
-  return {hubspot:hs,moinai:ma,team:tm,refunds:rf,costs:DATA.costs,ms_cpt:DATA.ms_cpt,team_agents:teamAgents,live:true};
+  return {hubspot:hs,moinai:ma,team:tm,refunds:rf,costs:DATA.costs,ms_cpt:DATA.ms_cpt,categories:DATA.categories,team_agents:teamAgents,live:true};
 }
 async function fetchLive(){
   const get=u=>fetch(u+'&_='+Date.now(),{cache:'no-store'})
@@ -1625,20 +1747,16 @@ chartCard(document.getElementById('sec-refunds'),{
     series:[{name:'Decline Rate',color:C.s8,values:rf.map(r=>r.decline_rate),fmt:fmtP}]}
 });
 chartCard(document.getElementById('sec-refunds'),{
-  title:'Money Contribution',hint:'Durch abgelehnte Refunds gesichertes Geld',
+  title:'Money Contribution',
+  hint:'Durch abgelehnte Refunds gesichertes Geld · Netto und Brutto sind zwei Sichten auf denselben Betrag',
   legend:[{name:'Netto',color:C.s8,type:'line'},{name:'Brutto',color:C.s3,type:'line'}],
   table:{cols:['Zeitraum','Netto','Brutto'],
     rows:rf.map(r=>[r.label,fmtEuro(r.net),fmtEuro(r.gross)])},
-  spec:{defaultView:'linie',labels:rfL,yFmt:fmtN,
+  spec:{defaultView:'linie',labels:rfL,yFmt:fmtN,grouped:true,noPie:true,
     series:[{name:'Netto',color:C.s8,values:rf.map(r=>r.net),fmt:fmtEuro},
             {name:'Brutto',color:C.s3,values:rf.map(r=>r.gross),fmt:fmtEuro}]}
 });
-chartCard(document.getElementById('sec-refunds'),{
-  title:'Share of Refund Tickets',hint:'Anteil der Refund-Tickets am Gesamtvolumen',
-  table:{cols:['Zeitraum','Anteil'],rows:rf.map(r=>[r.label,fmtP(r.share)])},
-  spec:{defaultView:'linie',labels:rfL,yFmt:v=>Math.round(v*100)+' %',labelLast:true,
-    series:[{name:'Anteil',color:C.s8,values:rf.map(r=>r.share),fmt:fmtP}]}
-});
+topProblemsCard(document.getElementById('sec-refunds'),D.categories,6);
 
 /* Costs */
 const coL=co.map(r=>r.month);
